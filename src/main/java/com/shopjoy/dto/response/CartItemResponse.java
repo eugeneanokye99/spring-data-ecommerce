@@ -1,0 +1,27 @@
+package com.shopjoy.dto.response;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.time.LocalDateTime;
+
+/**
+ * Response DTO for CartItem.
+ */
+@Setter
+@Getter
+@AllArgsConstructor
+@NoArgsConstructor
+public class CartItemResponse {
+    
+    private int cartItemId;
+    private int userId;
+    private int productId;
+    private String productName;
+    private double productPrice;
+    private int quantity;
+    private LocalDateTime createdAt;
+
+}
