@@ -1,6 +1,6 @@
 package com.shopjoy.service.impl;
 
-import com.shopjoy.dto.mapper.CartItemMapper;
+import com.shopjoy.dto.mapper.CartItemMapperStruct;
 import com.shopjoy.dto.request.AddToCartRequest;
 import com.shopjoy.dto.response.CartItemResponse;
 import com.shopjoy.dto.response.ProductResponse;
@@ -12,6 +12,7 @@ import com.shopjoy.repository.CartItemRepository;
 import com.shopjoy.service.CartService;
 import com.shopjoy.service.InventoryService;
 import com.shopjoy.service.ProductService;
+import lombok.AllArgsConstructor;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,28 +27,13 @@ import java.util.stream.Collectors;
  */
 @Service
 @Transactional(readOnly = true)
+@AllArgsConstructor
 public class CartServiceImpl implements CartService {
-
-
 
     private final CartItemRepository cartItemRepository;
     private final ProductService productService;
     private final InventoryService inventoryService;
-
-    /**
-     * Instantiates a new Cart service.
-     *
-     * @param cartItemRepository the cart item repository
-     * @param productService     the product service
-     * @param inventoryService   the inventory service
-     */
-    public CartServiceImpl(CartItemRepository cartItemRepository,
-            ProductService productService,
-            InventoryService inventoryService) {
-        this.cartItemRepository = cartItemRepository;
-        this.productService = productService;
-        this.inventoryService = inventoryService;
-    }
+    private final CartItemMapperStruct cartItemMapper;
 
     @Override
     @Transactional()
@@ -162,6 +148,6 @@ public class CartServiceImpl implements CartService {
         } catch (Exception e) {
             // Ignore product fetch errors
         }
-        return CartItemMapper.toCartItemResponse(cartItem, productName, price);
+        return cartItemMapper.toCartItemResponse(cartItem, productName, price);
     }
 }

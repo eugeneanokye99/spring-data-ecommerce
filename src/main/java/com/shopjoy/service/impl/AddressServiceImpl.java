@@ -1,6 +1,6 @@
 package com.shopjoy.service.impl;
 
-import com.shopjoy.dto.mapper.AddressMapper;
+import com.shopjoy.dto.mapper.AddressMapperStruct;
 import com.shopjoy.dto.request.CreateAddressRequest;
 import com.shopjoy.dto.request.UpdateAddressRequest;
 import com.shopjoy.dto.response.AddressResponse;
@@ -8,6 +8,8 @@ import com.shopjoy.entity.Address;
 import com.shopjoy.exception.ResourceNotFoundException;
 import com.shopjoy.repository.AddressRepository;
 import com.shopjoy.service.AddressService;
+
+import lombok.AllArgsConstructor;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,36 +23,26 @@ import java.util.stream.Collectors;
  */
 @Service
 @Transactional(readOnly = true)
+@AllArgsConstructor
 public class AddressServiceImpl implements AddressService {
     
-
-    
     private final AddressRepository addressRepository;
-
-    /**
-     * Instantiates a new Address service.
-     *
-     * @param addressRepository the address repository
-     */
-    public AddressServiceImpl(AddressRepository addressRepository) {
-        this.addressRepository = addressRepository;
-    }
+    private final AddressMapperStruct addressMapper;
     
     @Override
     @Transactional()
     public AddressResponse createAddress(CreateAddressRequest request) {
-        Address address = AddressMapper.toAddress(request);
+        Address address = addressMapper.toAddress(request);
         address.setCreatedAt(LocalDateTime.now());
-        
         Address savedAddress = addressRepository.save(address);
-        return AddressMapper.toAddressResponse(savedAddress);
+        return addressMapper.toAddressResponse(savedAddress);
     }
     
     @Override
     public AddressResponse getAddressById(Integer addressId) {
         Address address = addressRepository.findById(addressId)
                 .orElseThrow(() -> new ResourceNotFoundException("Address", "id", addressId));
-        return AddressMapper.toAddressResponse(address);
+        return addressMapper.toAddressResponse(address);
     }
     
     @Override
@@ -58,7 +50,7 @@ public class AddressServiceImpl implements AddressService {
 
         List<Address> addresses = addressRepository.findByUserId(userId);
         return addresses.stream()
-                .map(AddressMapper::toAddressResponse)
+                .map(addressMapper::toAddressResponse)
                 .collect(Collectors.toList());
     }
 
@@ -68,10 +60,10 @@ public class AddressServiceImpl implements AddressService {
         Address address = addressRepository.findById(addressId)
                 .orElseThrow(() -> new ResourceNotFoundException("Address", "id", addressId));
         
-        AddressMapper.updateAddressFromRequest(address, request);
+        addressMapper.updateAddressFromRequest(request, address);
         
         Address updatedAddress = addressRepository.update(address);
-        return AddressMapper.toAddressResponse(updatedAddress);
+        return addressMapper.toAddressResponse(updatedAddress);
     }
     
     @Override
@@ -92,13 +84,13 @@ public class AddressServiceImpl implements AddressService {
         
         addressRepository.clearDefaultAddresses(address.getUserId());
         Address updatedAddress = addressRepository.setDefaultAddress(addressId);
-        return AddressMapper.toAddressResponse(updatedAddress);
+        return addressMapper.toAddressResponse(updatedAddress);
     }
     
     @Override
     public AddressResponse getDefaultAddress(Integer userId) {
         Address address = addressRepository.findDefaultAddress(userId)
                 .orElse(null);
-        return address != null ? AddressMapper.toAddressResponse(address) : null;
+        return address != null ? addressMapper.toAddressResponse(address) : null;
     }
 }

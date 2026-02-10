@@ -1,7 +1,7 @@
 package com.shopjoy.service.impl;
 
 import com.shopjoy.aspect.Auditable;
-import com.shopjoy.dto.mapper.UserMapper;
+import com.shopjoy.dto.mapper.UserMapperStruct;
 import com.shopjoy.dto.request.CreateUserRequest;
 import com.shopjoy.dto.request.UpdateUserRequest;
 import com.shopjoy.dto.response.UserResponse;
@@ -13,6 +13,7 @@ import com.shopjoy.exception.ResourceNotFoundException;
 import com.shopjoy.exception.ValidationException;
 import com.shopjoy.repository.UserRepository;
 import com.shopjoy.service.UserService;
+import lombok.AllArgsConstructor;
 import org.mindrot.jbcrypt.BCrypt;
 
 import org.springframework.stereotype.Service;
@@ -28,20 +29,11 @@ import java.util.stream.Collectors;
  */
 @Service
 @Transactional(readOnly = true)
+@AllArgsConstructor
 public class UserServiceImpl implements UserService {
 
-
-
     private final UserRepository userRepository;
-
-    /**
-     * Instantiates a new User service.
-     *
-     * @param userRepository the user repository
-     */
-    public UserServiceImpl(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
+    private final UserMapperStruct userMapper;
 
     @Override
     @Transactional()
@@ -57,13 +49,13 @@ public class UserServiceImpl implements UserService {
             throw new DuplicateResourceException("User", "email", request.getEmail());
         }
 
-        User user = UserMapper.toUser(request);
+        User user = userMapper.toUser(request);
         user.setCreatedAt(LocalDateTime.now());
         user.setUpdatedAt(LocalDateTime.now());
 
         User createdUser = userRepository.save(user);
 
-        return UserMapper.toUserResponse(createdUser);
+        return userMapper.toUserResponse(createdUser);
     }
 
     @Override
@@ -82,32 +74,32 @@ public class UserServiceImpl implements UserService {
             throw new AuthenticationException();
         }
 
-        return UserMapper.toUserResponse(userOpt.get());
+        return userMapper.toUserResponse(userOpt.get());
     }
 
     @Override
     public UserResponse getUserById(Integer userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
-        return UserMapper.toUserResponse(user);
+        return userMapper.toUserResponse(user);
     }
 
     @Override
     public Optional<UserResponse> getUserByEmail(String email) {
         return userRepository.findByEmail(email)
-                .map(UserMapper::toUserResponse);
+                .map(userMapper::toUserResponse);
     }
 
     @Override
     public Optional<UserResponse> getUserByUsername(String username) {
         return userRepository.findByUsername(username)
-                .map(UserMapper::toUserResponse);
+                .map(userMapper::toUserResponse);
     }
 
     @Override
     public List<UserResponse> getAllUsers() {
         return userRepository.findAll().stream()
-                .map(UserMapper::toUserResponse)
+                .map(userMapper::toUserResponse)
                 .collect(Collectors.toList());
     }
 
@@ -117,7 +109,7 @@ public class UserServiceImpl implements UserService {
             throw new ValidationException("User type cannot be null");
         }
         return userRepository.findByUserType(userType).stream()
-                .map(UserMapper::toUserResponse)
+                .map(userMapper::toUserResponse)
                 .collect(Collectors.toList());
     }
 
@@ -136,12 +128,12 @@ public class UserServiceImpl implements UserService {
         }
 
         // Apply updates
-        UserMapper.updateUserFromRequest(existingUser, request);
+        userMapper.updateUserFromRequest(request, existingUser);
         existingUser.setUpdatedAt(LocalDateTime.now());
 
         User updatedUser = userRepository.update(existingUser);
 
-        return UserMapper.toUserResponse(updatedUser);
+        return userMapper.toUserResponse(updatedUser);
     }
 
     @Override

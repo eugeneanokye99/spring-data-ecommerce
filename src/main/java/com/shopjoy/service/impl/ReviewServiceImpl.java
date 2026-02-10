@@ -1,6 +1,6 @@
 package com.shopjoy.service.impl;
 
-import com.shopjoy.dto.mapper.ReviewMapper;
+import com.shopjoy.dto.mapper.ReviewMapperStruct;
 import com.shopjoy.dto.request.CreateReviewRequest;
 import com.shopjoy.dto.request.UpdateReviewRequest;
 import com.shopjoy.dto.response.ReviewResponse;
@@ -14,6 +14,7 @@ import com.shopjoy.repository.ReviewRepository;
 import com.shopjoy.repository.UserRepository;
 import com.shopjoy.service.ReviewService;
 
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,33 +27,18 @@ import java.util.stream.Collectors;
  */
 @Service
 @Transactional(readOnly = true)
+@AllArgsConstructor
 public class ReviewServiceImpl implements ReviewService {
-
-
 
     private final ReviewRepository reviewRepository;
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
+    private final ReviewMapperStruct reviewMapper;
 
-    /**
-     * Instantiates a new Review service.
-     *
-     * @param reviewRepository the review repository
-     * @param orderRepository  the order repository
-     */
-    public ReviewServiceImpl(ReviewRepository reviewRepository,
-            OrderRepository orderRepository,
-            UserRepository userRepository,
-            ProductRepository productRepository) {
-        this.reviewRepository = reviewRepository;
-        this.orderRepository = orderRepository;
-        this.userRepository = userRepository;
-        this.productRepository = productRepository;
-    }
 
     private ReviewResponse convertToResponse(Review review) {
-        ReviewResponse response = ReviewMapper.toReviewResponse(review);
+        ReviewResponse response = reviewMapper.toReviewResponse(review);
 
         userRepository.findById(review.getUserId())
                 .ifPresent(user -> response.setUserName(user.getFirstName() + " " + user.getLastName()));
@@ -66,7 +52,7 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     @Transactional()
     public ReviewResponse createReview(CreateReviewRequest request) {
-        Review review = ReviewMapper.toReview(request);
+        Review review = reviewMapper.toReview(request);
         validateReviewData(review);
 
         if (reviewRepository.hasUserReviewedProduct(review.getUserId(), review.getProductId())) {
@@ -115,7 +101,7 @@ public class ReviewServiceImpl implements ReviewService {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> new ResourceNotFoundException("Review", "id", reviewId));
 
-        ReviewMapper.updateReviewFromRequest(review, request);
+        reviewMapper.updateReviewFromRequest(request, review);
         validateReviewData(review);
 
         Review updatedReview = reviewRepository.update(review);

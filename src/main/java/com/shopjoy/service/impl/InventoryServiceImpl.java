@@ -1,6 +1,6 @@
 package com.shopjoy.service.impl;
 
-import com.shopjoy.dto.mapper.InventoryMapper;
+import com.shopjoy.dto.mapper.InventoryMapperStruct;
 import com.shopjoy.dto.response.InventoryResponse;
 import com.shopjoy.entity.Inventory;
 import com.shopjoy.exception.DuplicateResourceException;
@@ -10,6 +10,7 @@ import com.shopjoy.exception.ValidationException;
 import com.shopjoy.repository.InventoryRepository;
 import com.shopjoy.repository.ProductRepository;
 import com.shopjoy.service.InventoryService;
+import lombok.AllArgsConstructor;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,23 +25,12 @@ import java.util.stream.Collectors;
  */
 @Service
 @Transactional(readOnly = true)
+@AllArgsConstructor
 public class InventoryServiceImpl implements InventoryService {
-
-
 
     private final InventoryRepository inventoryRepository;
     private final ProductRepository productRepository;
-
-    /**
-     * Instantiates a new Inventory service.
-     *
-     * @param inventoryRepository the inventory repository
-     * @param productRepository   the product repository
-     */
-    public InventoryServiceImpl(InventoryRepository inventoryRepository, ProductRepository productRepository) {
-        this.inventoryRepository = inventoryRepository;
-        this.productRepository = productRepository;
-    }
+    private final InventoryMapperStruct inventoryMapper;
 
     @Override
     @Transactional()
@@ -243,6 +233,6 @@ public class InventoryServiceImpl implements InventoryService {
         } catch (Exception e) {
             // Ignore product fetch errors
         }
-        return InventoryMapper.toInventoryResponse(inventory, productName);
+        return inventoryMapper.toInventoryResponse(inventory, productName);
     }
 }

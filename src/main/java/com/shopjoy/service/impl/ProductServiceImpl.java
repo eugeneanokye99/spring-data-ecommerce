@@ -2,7 +2,7 @@ package com.shopjoy.service.impl;
 
 import com.shopjoy.aspect.Auditable;
 import com.shopjoy.dto.filter.ProductFilter;
-import com.shopjoy.dto.mapper.ProductMapper;
+import com.shopjoy.dto.mapper.ProductMapperStruct;
 import com.shopjoy.dto.request.CreateProductRequest;
 import com.shopjoy.dto.request.UpdateProductRequest;
 import com.shopjoy.dto.response.ProductResponse;
@@ -13,6 +13,7 @@ import com.shopjoy.repository.ProductRepository;
 import com.shopjoy.service.ProductService;
 import com.shopjoy.util.*;
 
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,21 +28,13 @@ import java.util.stream.Collectors;
  */
 @Service
 @Transactional(readOnly = true)
+@AllArgsConstructor
 public class ProductServiceImpl implements ProductService {
-
-
 
     private final ProductRepository productRepository;
     private final com.shopjoy.repository.InventoryRepository inventoryRepository;
     private final com.shopjoy.repository.CategoryRepository categoryRepository;
-
-    public ProductServiceImpl(ProductRepository productRepository,
-            com.shopjoy.repository.InventoryRepository inventoryRepository,
-            com.shopjoy.repository.CategoryRepository categoryRepository) {
-        this.productRepository = productRepository;
-        this.inventoryRepository = inventoryRepository;
-        this.categoryRepository = categoryRepository;
-    }
+    private final ProductMapperStruct productMapper;
 
     private ProductResponse convertToResponse(Product product) {
         String categoryName = categoryRepository.findById(product.getCategoryId())
@@ -50,13 +43,13 @@ public class ProductServiceImpl implements ProductService {
         int stock = inventoryRepository.findByProductId(product.getProductId())
                 .map(com.shopjoy.entity.Inventory::getQuantityInStock)
                 .orElse(0);
-        return ProductMapper.toProductResponse(product, categoryName, stock);
+        return productMapper.toProductResponse(product, categoryName, stock);
     }
 
     @Override
     @Transactional()
     public ProductResponse createProduct(CreateProductRequest request) {
-        Product product = ProductMapper.toProduct(request);
+        Product product = productMapper.toProduct(request);
         product.setCreatedAt(LocalDateTime.now());
         product.setUpdatedAt(LocalDateTime.now());
         product.setActive(true);
@@ -138,7 +131,7 @@ public class ProductServiceImpl implements ProductService {
         Product existingProduct = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
 
-        ProductMapper.updateProductFromRequest(existingProduct, request);
+        productMapper.updateProductFromRequest(request, existingProduct);
         existingProduct.setUpdatedAt(LocalDateTime.now());
 
         validateProductData(existingProduct);

@@ -1,7 +1,7 @@
 package com.shopjoy.service.impl;
 
-import com.shopjoy.dto.mapper.OrderItemMapper;
-import com.shopjoy.dto.mapper.OrderMapper;
+import com.shopjoy.dto.mapper.OrderMapperStruct;
+import com.shopjoy.dto.mapper.OrderItemMapperStruct;
 import com.shopjoy.dto.request.CreateOrderItemRequest;
 import com.shopjoy.dto.request.CreateOrderRequest;
 import com.shopjoy.dto.request.UpdateOrderItemRequest;
@@ -46,6 +46,8 @@ public class OrderServiceImpl implements OrderService {
     private final InventoryService inventoryService;
     private final ProductService productService;
     private final UserService userService;
+    private final OrderMapperStruct orderMapper;
+    private final OrderItemMapperStruct orderItemMapper;
 
     /**
      * Instantiates a new Order service.
@@ -60,12 +62,16 @@ public class OrderServiceImpl implements OrderService {
             OrderItemRepository orderItemRepository,
             InventoryService inventoryService,
             ProductService productService,
-            UserService userService) {
+            UserService userService,
+            OrderMapperStruct orderMapper,
+            OrderItemMapperStruct orderItemMapper) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.inventoryService = inventoryService;
         this.productService = productService;
         this.userService = userService;
+        this.orderMapper = orderMapper;
+        this.orderItemMapper = orderItemMapper;
     }
 
     /**
@@ -112,7 +118,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // Create the order
-        Order order = OrderMapper.toOrder(request);
+        Order order = orderMapper.toOrder(request);
         order.setOrderDate(LocalDateTime.now());
         order.setStatus(OrderStatus.PENDING);
         order.setPaymentStatus(PaymentStatus.UNPAID);
@@ -450,9 +456,9 @@ public OrderResponse updateOrder(Integer orderId, UpdateOrderRequest request) {
             } catch (Exception e) {
                 // Ignore product fetch errors
             }
-            return OrderItemMapper.toOrderItemResponse(item, productName);
+            return orderItemMapper.toOrderItemResponse(item, productName);
         }).collect(Collectors.toList());
 
-        return OrderMapper.toOrderResponse(order, userName, itemResponses);
+        return orderMapper.toOrderResponse(order, userName, itemResponses);
     }
 }

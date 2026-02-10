@@ -1,6 +1,6 @@
 package com.shopjoy.service.impl;
 
-import com.shopjoy.dto.mapper.CategoryMapper;
+import com.shopjoy.dto.mapper.CategoryMapperStruct;
 import com.shopjoy.dto.request.CreateCategoryRequest;
 import com.shopjoy.dto.request.UpdateCategoryRequest;
 import com.shopjoy.dto.response.CategoryResponse;
@@ -12,6 +12,7 @@ import com.shopjoy.repository.CategoryRepository;
 import com.shopjoy.service.CategoryService;
 import com.shopjoy.service.ProductService;
 
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,28 +25,17 @@ import java.util.stream.Collectors;
  */
 @Service
 @Transactional(readOnly = true)
+@AllArgsConstructor
 public class CategoryServiceImpl implements CategoryService {
-    
-
     
     private final CategoryRepository categoryRepository;
     private final ProductService productService;
-
-    /**
-     * Instantiates a new Category service.
-     *
-     * @param categoryRepository the category repository
-     * @param productService     the product service
-     */
-    public CategoryServiceImpl(CategoryRepository categoryRepository, ProductService productService) {
-        this.categoryRepository = categoryRepository;
-        this.productService = productService;
-    }
+    private final CategoryMapperStruct categoryMapper;
     
     @Override
     @Transactional()
     public CategoryResponse createCategory(CreateCategoryRequest request) {
-        Category category = CategoryMapper.toCategory(request);
+        Category category = categoryMapper.toCategory(request);
         
         validateCategoryData(category);
         
@@ -57,27 +47,27 @@ public class CategoryServiceImpl implements CategoryService {
         category.setCreatedAt(LocalDateTime.now());
         Category createdCategory = categoryRepository.save(category);
         
-        return CategoryMapper.toCategoryResponse(createdCategory);
+        return categoryMapper.toCategoryResponse(createdCategory);
     }
     
     @Override
     public CategoryResponse getCategoryById(Integer categoryId) {
         Category category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "id", categoryId));
-        return CategoryMapper.toCategoryResponse(category);
+        return categoryMapper.toCategoryResponse(category);
     }
     
     @Override
     public List<CategoryResponse> getAllCategories() {
         return categoryRepository.findAll().stream()
-                .map(CategoryMapper::toCategoryResponse)
+                .map(categoryMapper::toCategoryResponse)
                 .collect(Collectors.toList());
     }
     
     @Override
     public List<CategoryResponse> getTopLevelCategories() {
         return categoryRepository.findTopLevelCategories().stream()
-                .map(CategoryMapper::toCategoryResponse)
+                .map(categoryMapper::toCategoryResponse)
                 .collect(Collectors.toList());
     }
     
@@ -87,7 +77,7 @@ public class CategoryServiceImpl implements CategoryService {
             throw new ValidationException("Parent category ID cannot be null");
         }
         return categoryRepository.findSubcategories(parentCategoryId).stream()
-                .map(CategoryMapper::toCategoryResponse)
+                .map(categoryMapper::toCategoryResponse)
                 .collect(Collectors.toList());
     }
     
@@ -105,7 +95,7 @@ public class CategoryServiceImpl implements CategoryService {
         Category category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "id", categoryId));
         
-        CategoryMapper.updateCategoryFromRequest(category, request);
+        categoryMapper.updateCategoryFromRequest(request, category);
         validateCategoryData(category);
         
         if (category.getParentCategoryId() != null) {
@@ -120,7 +110,7 @@ public class CategoryServiceImpl implements CategoryService {
         
         Category updatedCategory = categoryRepository.update(category);
         
-        return CategoryMapper.toCategoryResponse(updatedCategory);
+        return categoryMapper.toCategoryResponse(updatedCategory);
     }
     
     @Override
@@ -164,7 +154,7 @@ public class CategoryServiceImpl implements CategoryService {
         
         category.setParentCategoryId(newParentId);
         Category updatedCategory = categoryRepository.update(category);
-        return CategoryMapper.toCategoryResponse(updatedCategory);
+        return categoryMapper.toCategoryResponse(updatedCategory);
     }
     
     private boolean wouldCreateCircularReference(Integer categoryId, Integer newParentId) {
