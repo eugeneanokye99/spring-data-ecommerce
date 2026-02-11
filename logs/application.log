@@ -25895,3 +25895,14 @@ where
 2026-02-11 09:22:10.682 [ShopJoyHikariCP:housekeeper] DEBUG com.zaxxer.hikari.pool.HikariPool - ShopJoyHikariCP - Before cleanup stats (total=2/5, idle=2/2, active=0, waiting=0)
 2026-02-11 09:22:10.682 [ShopJoyHikariCP:housekeeper] DEBUG com.zaxxer.hikari.pool.HikariPool - ShopJoyHikariCP - After  cleanup stats (total=2/5, idle=2/2, active=0, waiting=0)
 2026-02-11 09:22:10.682 [ShopJoyHikariCP:housekeeper] DEBUG com.zaxxer.hikari.pool.HikariPool - ShopJoyHikariCP - Fill pool skipped, pool has sufficient level or currently being filled.
+2026-02-11 09:22:40.697 [ShopJoyHikariCP:housekeeper] DEBUG com.zaxxer.hikari.pool.HikariPool - ShopJoyHikariCP - Before cleanup stats (total=2/5, idle=2/2, active=0, waiting=0)
+2026-02-11 09:22:40.697 [ShopJoyHikariCP:housekeeper] DEBUG com.zaxxer.hikari.pool.HikariPool - ShopJoyHikariCP - After  cleanup stats (total=2/5, idle=2/2, active=0, waiting=0)
+2026-02-11 09:22:40.697 [ShopJoyHikariCP:housekeeper] DEBUG com.zaxxer.hikari.pool.HikariPool - ShopJoyHikariCP - Fill pool skipped, pool has sufficient level or currently being filled.
+2026-02-11 09:23:10.708 [ShopJoyHikariCP:housekeeper] DEBUG com.zaxxer.hikari.pool.HikariPool - ShopJoyHikariCP - Before cleanup stats (total=2/5, idle=2/2, active=0, waiting=0)
+2026-02-11 09:23:10.708 [ShopJoyHikariCP:housekeeper] DEBUG com.zaxxer.hikari.pool.HikariPool - ShopJoyHikariCP - After  cleanup stats (total=2/5, idle=2/2, active=0, waiting=0)
+2026-02-11 09:23:10.708 [ShopJoyHikariCP:housekeeper] DEBUG com.zaxxer.hikari.pool.HikariPool - ShopJoyHikariCP - Fill pool skipped, pool has sufficient level or currently being filled.
+2026-02-11 09:23:23.074 [ShopJoyHikariCP:housekeeper] DEBUG com.zaxxer.hikari.pool.HikariPool - ShopJoyHikariCP - keepalive: connection org.postgresql.jdbc.PgConnection@78679a76 is alive
+2026-02-11 09:23:40.719 [ShopJoyHikariCP:housekeeper] DEBUG com.zaxxer.hikari.pool.HikariPool - ShopJoyHikariCP - Before cleanup stats (total=2/5, idle=2/2, active=0, waiting=0)
+2026-02-11 09:23:40.719 [ShopJoyHikariCP:housekeeper] DEBUG com.zaxxer.hikari.pool.HikariPool - ShopJoyHikariCP - After  cleanup stats (total=2/5, idle=2/2, active=0, waiting=0)
+2026-02-11 09:23:40.719 [ShopJoyHikariCP:housekeeper] DEBUG com.zaxxer.hikari.pool.HikariPool - ShopJoyHikariCP - Fill pool skipped, pool has sufficient level or currently being filled.
+2026-02-11 09:23:45.578 [ShopJoyHikariCP:housekeeper] DEBUG com.zaxxer.hikari.pool.HikariPool - ShopJoyHikariCP - keepalive: connection org.postgresql.jdbc.PgConnection@72e1e587 is alive
