@@ -16,10 +16,10 @@ import lombok.Setter;
 public class OrderItemResponse {
 
     @Schema(description = "Order item unique identifier", example = "1")
-    private int orderItemId;
+    private Integer orderItemId;
 
     @Schema(description = "Product unique identifier", example = "101")
-    private int productId;
+    private Integer productId;
 
     @Schema(description = "Product name", example = "Dell XPS 15")
     private String productName;
@@ -32,4 +32,7 @@ public class OrderItemResponse {
 
     @Schema(description = "Subtotal for this item (quantity * price)", example = "2599.98")
     private double subtotal;
+
+    @Schema(description = "Category name of the product", example = "Electronics")
+    private String categoryName;
 }

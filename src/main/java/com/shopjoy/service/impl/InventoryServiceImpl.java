@@ -13,10 +13,12 @@ import com.shopjoy.service.InventoryService;
 import lombok.AllArgsConstructor;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -33,7 +35,7 @@ public class InventoryServiceImpl implements InventoryService {
     private final InventoryMapperStruct inventoryMapper;
 
     @Override
-    @Transactional()
+    @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
     public InventoryResponse createInventory(Integer productId, int initialStock, int reorderLevel) {
         Inventory inventory = new Inventory();
         inventory.setProductId(productId);
@@ -83,7 +85,7 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
-    @Transactional()
+    @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
     public InventoryResponse updateStock(Integer productId, int newQuantity) {
         if (newQuantity < 0) {
             throw new ValidationException("quantityInStock", "cannot be negative");
@@ -101,7 +103,7 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
-    @Transactional()
+    @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
     public InventoryResponse addStock(Integer productId, int quantity) {
         if (quantity <= 0) {
             throw new ValidationException("quantity", "must be positive");
@@ -120,7 +122,7 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
-    @Transactional()
+    @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
     public InventoryResponse removeStock(Integer productId, int quantity) {
         if (quantity <= 0) {
             throw new ValidationException("quantity", "must be positive");
@@ -144,8 +146,15 @@ public class InventoryServiceImpl implements InventoryService {
         return convertToResponse(inventory);
     }
 
+    /**
+     * RESERVATION TRANSACTION LOGIC
+     * <p>
+     * This method is designed to be called within an existing order transaction.
+     * It uses REQUIRED propagation to join the caller's transaction context.
+     * If the order creation fails later, this stock decrement will be rolled back.
+     */
     @Override
-    @Transactional()
+    @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
     public void reserveStock(Integer productId, int quantity) {
         if (quantity <= 0) {
             throw new ValidationException("quantity", "must be positive");
@@ -165,7 +174,7 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
-    @Transactional()
+    @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
     public void releaseStock(Integer productId, int quantity) {
         if (quantity <= 0) {
             throw new ValidationException("quantity", "must be positive");
@@ -176,21 +185,19 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     public List<InventoryResponse> getLowStockProducts() {
-        return inventoryRepository.findLowStock().stream()
-                .map(this::convertToResponse)
-                .collect(Collectors.toList());
+        return convertToResponses(inventoryRepository.findLowStock());
     }
 
     @Override
     public List<InventoryResponse> getOutOfStockProducts() {
-        return inventoryRepository.findAll().stream()
+        List<Inventory> outOfStock = inventoryRepository.findAll().stream()
                 .filter(inventory -> inventory.getQuantityInStock() == 0)
-                .map(this::convertToResponse)
                 .toList();
+        return convertToResponses(outOfStock);
     }
 
     @Override
-    @Transactional()
+    @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
     public InventoryResponse updateReorderLevel(Integer productId, int reorderLevel) {
         if (reorderLevel < 0) {
             throw new ValidationException("reorderLevel", "cannot be negative");
@@ -201,9 +208,18 @@ public class InventoryServiceImpl implements InventoryService {
         inventory.setReorderLevel(reorderLevel);
         inventory.setUpdatedAt(LocalDateTime.now());
 
-        Inventory updatedInventory = inventoryRepository.update(inventory);
+        Inventory updatedInventory = inventoryRepository.save(inventory);
 
         return convertToResponse(updatedInventory);
+    }
+
+    @Override
+    public List<InventoryResponse> getInventoryByProducts(List<Integer> productIds) {
+        if (productIds == null || productIds.isEmpty()) {
+            return List.of();
+        }
+        List<Inventory> inventories = inventoryRepository.findByProductIdIn(productIds);
+        return convertToResponses(inventories);
     }
 
     private void validateInventoryData(Inventory inventory) {
@@ -234,5 +250,30 @@ public class InventoryServiceImpl implements InventoryService {
             // Ignore product fetch errors
         }
         return inventoryMapper.toInventoryResponse(inventory, productName);
+    }
+
+    /**
+     * Batch converts inventories to responses, fetching products in bulk.
+     */
+    private List<InventoryResponse> convertToResponses(List<Inventory> inventories) {
+        if (inventories.isEmpty()) {
+            return List.of();
+        }
+        
+        // Fetch all products in one query
+        List<Integer> productIds = inventories.stream()
+                .map(Inventory::getProductId)
+                .distinct()
+                .collect(Collectors.toList());
+        Map<Integer, String> productNameMap = productRepository.findAllById(productIds).stream()
+                .collect(Collectors.toMap(
+                        com.shopjoy.entity.Product::getProductId,
+                        com.shopjoy.entity.Product::getProductName));
+        
+        return inventories.stream()
+                .map(inventory -> inventoryMapper.toInventoryResponse(
+                        inventory,
+                        productNameMap.getOrDefault(inventory.getProductId(), "Unknown Product")))
+                .collect(Collectors.toList());
     }
 }

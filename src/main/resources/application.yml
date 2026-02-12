@@ -2,6 +2,18 @@ spring:
   application:
     name: shopjoy-ecommerce-system
   
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+    open-in-view: false
+  
   graphql:
     graphiql:
       enabled: true

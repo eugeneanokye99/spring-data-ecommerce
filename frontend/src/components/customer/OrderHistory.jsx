@@ -1,17 +1,50 @@
-import { useState } from 'react';
-import { useUserOrders, useUpdateOrderStatus } from '../../services/graphqlService';
+import { useState, useEffect } from 'react';
+import { useUserOrders, useUpdateOrderStatus, useUpdateOrder, useDeleteOrder } from '../../services/graphqlService';
 import { useAuth } from '../../context/AuthContext';
-import { Package, Clock, Truck, CheckCircle, XCircle, Trash2, X, Edit, Plus, Minus } from 'lucide-react';
+import { Package, Clock, Truck, CheckCircle, XCircle, Trash2, X, Edit, Plus, Minus, ChevronLeft, ChevronRight, Search, Filter, ArrowUpDown } from 'lucide-react';
+import { showErrorAlert, showSuccessToast, showWarningToast } from '../../utils/errorHandler';
 
 const OrderHistory = () => {
     const [editingOrder, setEditingOrder] = useState(null);
     const [editForm, setEditForm] = useState({});
     const [currentPage, setCurrentPage] = useState(0);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('ALL');
+    const [paymentStatusFilter, setPaymentStatusFilter] = useState('ALL');
+    const [sortBy, setSortBy] = useState('orderDate');
+    const [sortDirection, setSortDirection] = useState('DESC');
+    
     const { user } = useAuth();
-    const pageSize = 20;
+    const pageSize = 10;
 
-    const { data, loading, error, refetch } = useUserOrders(user?.userId, currentPage, pageSize);
+    const filter = {
+        searchTerm: searchTerm.trim() || null,
+        status: statusFilter === 'ALL' ? null : statusFilter,
+        paymentStatus: paymentStatusFilter === 'ALL' ? null : paymentStatusFilter
+    };
+
+    const { data, loading, error, refetch } = useUserOrders(
+        user?.userId, 
+        filter,
+        currentPage, 
+        pageSize,
+        sortBy,
+        sortDirection
+    );
+    
+    useEffect(() => {
+        if (error) {
+            const errorMessage = error?.graphQLErrors?.[0]?.message || error.message || 'Failed to load orders';
+            showErrorAlert({ message: errorMessage }, 'Order Sync Failed');
+        }
+    }, [error]);
+
+    useEffect(() => {
+        setCurrentPage(0);
+    }, [searchTerm, statusFilter, paymentStatusFilter, sortBy, sortDirection]);
     const [updateOrderStatusMutation] = useUpdateOrderStatus();
+    const [updateOrderMutation] = useUpdateOrder();
+    const [deleteOrderMutation] = useDeleteOrder();
 
     const orders = data?.orders?.orders || [];
     const pageInfo = data?.orders?.pageInfo || {};
@@ -25,22 +58,26 @@ const OrderHistory = () => {
                     status: 'CANCELLED' 
                 }
             });
+            showSuccessToast('Order cancelled successfully');
             // Refetch data to show updated status
             refetch();
         } catch (error) {
             const errorMessage = error?.graphQLErrors?.[0]?.message || error.message || 'Failed to cancel order';
-            alert(errorMessage);
+            showErrorAlert({ message: errorMessage }, 'Failed to cancel order');
         }
     };
 
     const handleDeleteOrder = async (orderId) => {
         if (!window.confirm('Are you sure you want to delete this order?')) return;
         try {
-            // Note: Delete functionality would need to be added to GraphQL schema
-            // For now, we'll just show an alert
-            alert('Delete functionality not available in GraphQL version yet');
+            await deleteOrderMutation({
+                variables: { id: orderId.toString() }
+            });
+            showSuccessToast('Order deleted successfully');
+            refetch();
         } catch (error) {
-            alert(error.message || 'Failed to delete order');
+            const errorMessage = error?.graphQLErrors?.[0]?.message || error.message || 'Failed to delete order';
+            showErrorAlert({ message: errorMessage }, 'Failed to delete order');
         }
     };
 
@@ -52,7 +89,7 @@ const OrderHistory = () => {
             paymentMethod: order.paymentMethod || 'CASH',
             notes: order.notes || '',
             orderItems: (order.orderItems || []).map(item => {
-                const unitPrice = item.price || (item.subtotal / item.quantity) || 0;
+                const unitPrice = item.unitPrice || item.price || (item.subtotal / item.quantity) || 0;
                 return {
                     orderItemId: item.orderItemId,
                     productId: item.productId,
@@ -79,12 +116,21 @@ const handleUpdateOrder = async (orderId) => {
         };
 
         console.log('Updating order with data:', updateData);
-        await updateOrder(orderId, updateData);
+        
+        await updateOrderMutation({
+            variables: {
+                id: orderId.toString(),
+                input: updateData
+            }
+        });
+
+        showSuccessToast('Order updated successfully');
         setEditingOrder(null);
-        loadOrders();
+        refetch();
     } catch (error) {
         console.error('Update error:', error);
-        alert(error.response?.data?.message || 'Failed to update order');
+        const errorMessage = error?.graphQLErrors?.[0]?.message || error.message || 'Failed to update order';
+        showErrorAlert({ message: errorMessage }, 'Failed to update order');
     }
 };
 
@@ -98,7 +144,7 @@ const handleUpdateOrder = async (orderId) => {
 
     const removeItem = (index) => {
         if (editForm.orderItems.length === 1) {
-            alert('Order must have at least one item');
+            showWarningToast('Order must have at least one item');
             return;
         }
         const updatedItems = editForm.orderItems.filter((_, i) => i !== index);
@@ -144,7 +190,7 @@ const handleUpdateOrder = async (orderId) => {
         );
     };
 
-    if (loading) {
+    if (loading && !data) {
         return (
             <div className="flex justify-center py-12">
                 <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
@@ -152,24 +198,69 @@ const handleUpdateOrder = async (orderId) => {
         );
     }
 
-    if (error) {
-        return (
-            <div className="flex flex-col items-center justify-center py-12">
-                <div className="text-red-600 mb-4">Error loading order history:</div>
-                <p className="text-gray-500 mb-4">{error.message}</p>
-                <button 
-                    onClick={refetch}
-                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-                >
-                    Try Again
-                </button>
-            </div>
-        );
-    }
-
     return (
-        <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-6">Order History</h1>
+        <div className="space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <h1 className="text-3xl font-bold text-gray-900">Order History</h1>
+                
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder="Search orders..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm w-full md:w-64"
+                        />
+                    </div>
+                    
+                    <div className="flex items-center gap-2 text-sm">
+                        <Filter className="w-4 h-4 text-gray-400" />
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 py-2 pl-2 pr-8 text-sm"
+                        >
+                            <option value="ALL">All Status</option>
+                            <option value="PENDING">Pending</option>
+                            <option value="PROCESSING">Processing</option>
+                            <option value="SHIPPED">Shipped</option>
+                            <option value="DELIVERED">Delivered</option>
+                            <option value="CANCELLED">Cancelled</option>
+                        </select>
+
+                        <select
+                            value={paymentStatusFilter}
+                            onChange={(e) => setPaymentStatusFilter(e.target.value)}
+                            className="border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 py-2 pl-2 pr-8 text-sm"
+                        >
+                            <option value="ALL">All Payment</option>
+                            <option value="PAID">Paid</option>
+                            <option value="UNPAID">Unpaid</option>
+                            <option value="PENDING">Pending</option>
+                        </select>
+                        
+                        <select
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value)}
+                            className="border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 py-2 pl-2 pr-8 text-sm"
+                        >
+                            <option value="orderDate">Order Date</option>
+                            <option value="totalAmount">Total Amount</option>
+                            <option value="orderId">Order ID</option>
+                        </select>
+                        
+                        <button
+                            onClick={() => setSortDirection(sortDirection === 'ASC' ? 'DESC' : 'ASC')}
+                            className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 bg-white"
+                            title={sortDirection === 'ASC' ? 'Sort Ascending' : 'Sort Descending'}
+                        >
+                            <ArrowUpDown className={`w-4 h-4 text-gray-600 transition-transform ${sortDirection === 'ASC' ? 'rotate-180' : ''}`} />
+                        </button>
+                    </div>
+                </div>
+            </div>
 
             {orders.length === 0 ? (
                 <div className="card p-12 text-center">
@@ -392,6 +483,40 @@ const handleUpdateOrder = async (orderId) => {
                             )}
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* Pagination Controls */}
+            {pageInfo.totalPages > 1 && (
+                <div className="mt-8 flex items-center justify-center gap-4">
+                    <button
+                        onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                        disabled={currentPage === 0}
+                        className="p-2 rounded-xl bg-white border border-gray-100 shadow-sm disabled:opacity-50 hover:bg-gray-50 transition-colors"
+                    >
+                        <ChevronLeft className="w-6 h-6" />
+                    </button>
+                    <div className="flex gap-2">
+                        {[...Array(pageInfo.totalPages)].map((_, i) => (
+                            <button
+                                key={i}
+                                onClick={() => setCurrentPage(i)}
+                                className={`w-10 h-10 rounded-xl font-bold transition-all ${currentPage === i
+                                    ? 'bg-primary-600 text-black shadow-lg shadow-primary-200'
+                                    : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-100'
+                                    }`}
+                            >
+                                {i + 1}
+                            </button>
+                        ))}
+                    </div>
+                    <button
+                        onClick={() => setCurrentPage(p => Math.min(pageInfo.totalPages - 1, p + 1))}
+                        disabled={currentPage === pageInfo.totalPages - 1}
+                        className="p-2 rounded-xl bg-white border border-gray-100 shadow-sm disabled:opacity-50 hover:bg-gray-50 transition-colors"
+                    >
+                        <ChevronRight className="w-6 h-6" />
+                    </button>
                 </div>
             )}
         </div>

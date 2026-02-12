@@ -1,5 +1,6 @@
 package com.shopjoy.service.impl;
 
+import com.shopjoy.dto.filter.OrderFilter;
 import com.shopjoy.dto.mapper.OrderMapperStruct;
 import com.shopjoy.dto.mapper.OrderItemMapperStruct;
 import com.shopjoy.dto.request.CreateOrderItemRequest;
@@ -9,9 +10,10 @@ import com.shopjoy.dto.request.UpdateOrderRequest;
 import com.shopjoy.dto.response.OrderItemResponse;
 import com.shopjoy.dto.response.OrderResponse;
 import com.shopjoy.dto.response.ProductResponse;
-import com.shopjoy.dto.response.UserResponse;
 import com.shopjoy.entity.Order;
 import com.shopjoy.entity.OrderItem;
+import com.shopjoy.entity.Product;
+import com.shopjoy.entity.User;
 import com.shopjoy.entity.OrderStatus;
 import com.shopjoy.entity.PaymentStatus;
 import com.shopjoy.exception.InvalidOrderStateException;
@@ -19,13 +21,18 @@ import com.shopjoy.exception.ResourceNotFoundException;
 import com.shopjoy.exception.ValidationException;
 import com.shopjoy.repository.OrderItemRepository;
 import com.shopjoy.repository.OrderRepository;
+import com.shopjoy.specification.OrderSpecification;
 import com.shopjoy.service.InventoryService;
 import com.shopjoy.service.OrderService;
 import com.shopjoy.service.ProductService;
 import com.shopjoy.service.UserService;
-
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -38,8 +45,6 @@ import java.util.stream.Collectors;
 @Service
 @Transactional(readOnly = true)
 public class OrderServiceImpl implements OrderService {
-
-
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
@@ -57,6 +62,8 @@ public class OrderServiceImpl implements OrderService {
      * @param inventoryService    the inventory service
      * @param productService      the product service
      * @param userService         the user service
+     * @param orderMapper         the order mapper
+     * @param orderItemMapper     the order item mapper
      */
     public OrderServiceImpl(OrderRepository orderRepository,
             OrderItemRepository orderItemRepository,
@@ -85,11 +92,12 @@ public class OrderServiceImpl implements OrderService {
      * 5. Creates order
      * 6. Creates order items
      * <p>
-     * If ANY step fails, entire transaction is rolled back.
-     * Uses SERIALIZABLE isolation to prevent phantom reads during stock checks.
+     * If ANY step fails (e.g. InsufficientStockException), the entire transaction 
+     * including inventory reservations and order record creation will be rolled back.
+     * Uses SERIALIZABLE isolation to prevent phantom reads during the stock check-and-reserve phase.
      */
     @Override
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Transactional(isolation = Isolation.SERIALIZABLE, propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
     public OrderResponse createOrder(CreateOrderRequest request) {
         userService.getUserById(request.getUserId());
 
@@ -101,15 +109,27 @@ public class OrderServiceImpl implements OrderService {
             throw new ValidationException("Order must have at least one item");
         }
 
-        // Validate products and inventory FIRST
+        // Fetch all products once and cache them
+        java.util.Map<Integer, ProductResponse> productCache = new java.util.HashMap<>();
         for (CreateOrderItemRequest itemReq : request.getOrderItems()) {
             ProductResponse product = productService.getProductById(itemReq.getProductId());
+            productCache.put(itemReq.getProductId(), product);
+        }
+
+        // Validate products and inventory
+        java.math.BigDecimal totalAmount = java.math.BigDecimal.ZERO;
+        for (CreateOrderItemRequest itemReq : request.getOrderItems()) {
+            ProductResponse product = productCache.get(itemReq.getProductId());
             if (!product.isActive()) {
                 throw new ValidationException("Product " + product.getProductName() + " is not active");
             }
             if (!inventoryService.hasAvailableStock(itemReq.getProductId(), itemReq.getQuantity())) {
                 throw new ValidationException("Insufficient stock for product: " + product.getProductName());
             }
+            // Calculate total amount from actual product prices
+            java.math.BigDecimal itemTotal = java.math.BigDecimal.valueOf(product.getPrice())
+                    .multiply(java.math.BigDecimal.valueOf(itemReq.getQuantity()));
+            totalAmount = totalAmount.add(itemTotal);
         }
 
         // Reserve inventory
@@ -119,6 +139,7 @@ public class OrderServiceImpl implements OrderService {
 
         // Create the order
         Order order = orderMapper.toOrder(request);
+        order.setTotalAmount(totalAmount);
         order.setOrderDate(LocalDateTime.now());
         order.setStatus(OrderStatus.PENDING);
         order.setPaymentStatus(PaymentStatus.UNPAID);
@@ -131,23 +152,40 @@ public class OrderServiceImpl implements OrderService {
         order.setCreatedAt(LocalDateTime.now());
         order.setUpdatedAt(LocalDateTime.now());
 
+        // Save order first to generate order ID and handle common fields
         Order createdOrder = orderRepository.save(order);
 
-        // Create order items
+        // Create order items using cached product prices and link to the saved order
         for (CreateOrderItemRequest itemReq : request.getOrderItems()) {
+            ProductResponse product = productCache.get(itemReq.getProductId());
+            java.math.BigDecimal unitPrice = java.math.BigDecimal.valueOf(product.getPrice());
+            java.math.BigDecimal subtotal = unitPrice.multiply(java.math.BigDecimal.valueOf(itemReq.getQuantity()));
+            
             OrderItem orderItem = OrderItem.builder()
                     .orderId(createdOrder.getOrderId())
                     .productId(itemReq.getProductId())
                     .quantity(itemReq.getQuantity())
-                    .unitPrice(itemReq.getPrice())
-                    .subtotal(itemReq.getQuantity() * itemReq.getPrice())
+                    .unitPrice(unitPrice)
+                    .subtotal(subtotal)
                     .createdAt(LocalDateTime.now())
                     .build();
             orderItemRepository.save(orderItem);
         }
 
+        // Return refreshed order with items
+        return getOrderById(createdOrder.getOrderId());
+    }
 
-        return convertToResponse(createdOrder);
+    @Override
+    public Page<OrderResponse> getOrders(Integer userId, OrderFilter filter, Pageable pageable) {
+        Specification<Order> spec = OrderSpecification.withFilters(userId, filter);
+        Page<Order> orderPage = orderRepository.findAll(spec, pageable);
+
+        List<OrderResponse> content = orderPage.getContent().stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
+
+        return new PageImpl<>(content, pageable, orderPage.getTotalElements());
     }
 
     @Override
@@ -166,6 +204,17 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    public Page<OrderResponse> getOrdersByUserPaginated(Integer userId, Pageable pageable) {
+        Page<Order> orderPage = orderRepository.findByUserId(userId, pageable);
+        
+        List<OrderResponse> content = orderPage.getContent().stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
+                
+        return new PageImpl<>(content, pageable, orderPage.getTotalElements());
+    }
+
+    @Override
     public List<OrderResponse> getOrdersByStatus(OrderStatus status) {
         if (status == null) {
             throw new ValidationException("Order status cannot be null");
@@ -174,6 +223,20 @@ public class OrderServiceImpl implements OrderService {
         return orders.stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public Page<OrderResponse> getOrdersByStatusPaginated(OrderStatus status, Pageable pageable) {
+        if (status == null) {
+            throw new ValidationException("Order status cannot be null");
+        }
+        Page<Order> orderPage = orderRepository.findByStatus(status, pageable);
+        
+        List<OrderResponse> content = orderPage.getContent().stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
+                
+        return new PageImpl<>(content, pageable, orderPage.getTotalElements());
     }
 
     @Override
@@ -190,6 +253,34 @@ public class OrderServiceImpl implements OrderService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public Page<OrderResponse> getOrdersByDateRangePaginated(LocalDateTime startDate, LocalDateTime endDate, Pageable pageable) {
+        if (startDate == null || endDate == null) {
+            throw new ValidationException("Start and end dates cannot be null");
+        }
+        if (startDate.isAfter(endDate)) {
+            throw new ValidationException("Start date must be before end date");
+        }
+        Page<Order> orderPage = orderRepository.findByDateRange(startDate, endDate, pageable);
+        
+        List<OrderResponse> content = orderPage.getContent().stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
+                
+        return new PageImpl<>(content, pageable, orderPage.getTotalElements());
+    }
+
+    @Override
+    public Page<OrderResponse> getAllOrdersPaginated(Pageable pageable) {
+        Page<Order> orderPage = orderRepository.findAll(pageable);
+        
+        List<OrderResponse> content = orderPage.getContent().stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
+                
+        return new PageImpl<>(content, pageable, orderPage.getTotalElements());
+    }
+
     /**
      * STATE MACHINE PATTERN EXAMPLE
      * <p>
@@ -198,7 +289,7 @@ public class OrderServiceImpl implements OrderService {
      * -> CANCELLED (from PENDING or PROCESSING only)
      */
     @Override
-    @Transactional()
+    @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
     public OrderResponse updateOrderStatus(Integer orderId, OrderStatus newStatus) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
@@ -209,13 +300,13 @@ public class OrderServiceImpl implements OrderService {
         order.setStatus(newStatus);
         order.setUpdatedAt(LocalDateTime.now());
 
-        Order updatedOrder = orderRepository.update(order);
+        Order updatedOrder = orderRepository.save(order);
 
         return convertToResponse(updatedOrder);
     }
 
     @Override
-    @Transactional()
+    @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
     public OrderResponse confirmOrder(Integer orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
@@ -228,7 +319,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    @Transactional()
+    @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
     public OrderResponse shipOrder(Integer orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
@@ -241,7 +332,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    @Transactional()
+    @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
     public OrderResponse completeOrder(Integer orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
@@ -254,17 +345,18 @@ public class OrderServiceImpl implements OrderService {
     }
 
     /**
-     * COMPLEX ROLLBACK SCENARIO
+     * COMPLEX ROLLBACK SCENARIO - Order Cancellation
      * <p>
      * When cancelling an order, we must:
      * 1. Validate order can be canceled
-     * 2. Release reserved inventory back to stock
+     * 2. Release reserved inventory back to stock (Atomic operation)
      * 3. Update order status
      * <p>
-     * If inventory release fails, entire transaction rolls back.
+     * If inventory release fails for any item, the status update will be rolled back,
+     * ensuring the order doesn't appear cancelled while stock is still missing.
      */
     @Override
-    @Transactional()
+    @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
     public OrderResponse cancelOrder(Integer orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
@@ -285,7 +377,7 @@ public class OrderServiceImpl implements OrderService {
         order.setStatus(OrderStatus.CANCELLED);
         order.setUpdatedAt(LocalDateTime.now());
 
-        Order cancelledOrder = orderRepository.update(order);
+        Order cancelledOrder = orderRepository.save(order);
 
         return convertToResponse(cancelledOrder);
     }
@@ -336,7 +428,7 @@ public OrderResponse updateOrder(Integer orderId, UpdateOrderRequest request) {
 
         // Delete old items
         for (OrderItem item : existingItems) {
-            orderItemRepository.delete(item.getOrderItemId());
+            orderItemRepository.deleteById(item.getOrderItemId());
         }
 
         // Validate and reserve inventory for new items
@@ -359,19 +451,19 @@ public OrderResponse updateOrder(Integer orderId, UpdateOrderRequest request) {
                     .orderId(orderId)
                     .productId(itemReq.getProductId())
                     .quantity(itemReq.getQuantity())
-                    .unitPrice(itemReq.getPrice())
-                    .subtotal(itemReq.getQuantity() * itemReq.getPrice())
+                    .unitPrice(new java.math.BigDecimal(itemReq.getPrice().toString()))
+                    .subtotal(new java.math.BigDecimal(itemReq.getQuantity() * itemReq.getPrice()))
                     .createdAt(LocalDateTime.now())
                     .build();
             orderItemRepository.save(orderItem);
         }
 
         // Update total amount
-        order.setTotalAmount(newTotal);
+        order.setTotalAmount(new java.math.BigDecimal(newTotal));
     }
 
     order.setUpdatedAt(LocalDateTime.now());
-    Order updatedOrder = orderRepository.update(order);
+    Order updatedOrder = orderRepository.save(order);
     
     return convertToResponse(updatedOrder);
 }
@@ -392,7 +484,7 @@ public OrderResponse updateOrder(Integer orderId, UpdateOrderRequest request) {
             inventoryService.releaseStock(item.getProductId(), item.getQuantity());
         }
 
-        orderRepository.delete(orderId);
+        orderRepository.deleteById(orderId);
     }
 
     private void validateStatusTransition(OrderStatus currentStatus, OrderStatus newStatus) {
@@ -441,24 +533,91 @@ public OrderResponse updateOrder(Integer orderId, UpdateOrderRequest request) {
     private OrderResponse convertToResponse(Order order) {
         String userName = "Unknown User";
         try {
-            UserResponse user = userService.getUserById(order.getUserId());
-            userName = user.getFirstName() + " " + user.getLastName();
+            // Using the JPA relationship with @BatchSize for efficiency 
+            // instead of calling userService in a loop (N+1)
+            User user = order.getUser();
+            if (user != null) {
+                userName = user.getFirstName() + " " + user.getLastName();
+            }
         } catch (Exception e) {
-            // Ignore user fetch errors
+            // Fallback to Unknown if user cannot be fetched
         }
 
-        List<OrderItem> items = orderItemRepository.findByOrderId(order.getOrderId());
-        List<OrderItemResponse> itemResponses = items.stream().map(item -> {
-            String productName = "Unknown Product";
+        // Using order.getOrderItems() instead of repository call
+        // This leverages @BatchSize(size = 20) added to the collection
+        List<OrderItemResponse> itemResponses = order.getOrderItems().stream().map(item -> {
             try {
-                ProductResponse product = productService.getProductById(item.getProductId());
-                productName = product.getProductName();
+                // Leveraging the lazy-loaded Product association within OrderItem
+                // Hibernate will batch fetch these products too due to @BatchSize on Product class
+                Product product = item.getProduct();
+                String productName = product != null ? product.getProductName() : "Unknown Product";
+                return orderItemMapper.toOrderItemResponse(item, productName);
             } catch (Exception e) {
-                // Ignore product fetch errors
+                return orderItemMapper.toOrderItemResponse(item, "Unknown Product");
             }
-            return orderItemMapper.toOrderItemResponse(item, productName);
         }).collect(Collectors.toList());
 
         return orderMapper.toOrderResponse(order, userName, itemResponses);
+    }
+
+    /**
+     * PAYMENT WORKFLOW DEMONSTRATION
+     * <p>
+     * This method simulates a payment confirmation workflow.
+     * 1. Updates payment status Atomically.
+     * 2. Transitions order status to PROCESSING.
+     * 3. Uses REQUIRED propagation to ensure both updates happen in one transaction.
+     * <p>
+     * If transitioning the order status fails (e.g., business rule violation), 
+     * the payment status update will also be rolled back.
+     */
+    @Override
+    @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
+    public OrderResponse processPayment(Integer orderId, String transactionId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new ValidationException("Order is already paid");
+        }
+
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            throw new InvalidOrderStateException(orderId, "CANCELLED", "process payment");
+        }
+
+        // Simulate payment gateway interaction or logging the transaction ID
+        order.setPaymentStatus(PaymentStatus.PAID);
+        order.setUpdatedAt(LocalDateTime.now());
+        
+        // Save initial state before transition
+        orderRepository.save(order);
+
+        // Chain status update - this happens within the same transaction context
+        return confirmOrder(orderId);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
+    public OrderResponse simulatePayment(Integer orderId, String transactionId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new ValidationException("Simulation: Order " + orderId + " is already paid.");
+        }
+
+        // 1. Update Payment Status (First step of the transaction)
+        order.setPaymentStatus(PaymentStatus.PAID);
+        order.setUpdatedAt(LocalDateTime.now());
+        orderRepository.save(order);
+
+        // 2. Demonstration of Rollback
+        // Trigger failure if transactionId starts with "FAIL-"
+        if (transactionId != null && transactionId.startsWith("FAIL-")) {
+            throw new RuntimeException("Simulated payment gateway failure for order " + orderId);
+        }
+
+        // 3. Update Order Status (Final step) - transition to PROCESSING
+        return confirmOrder(orderId);
     }
 }

@@ -11,6 +11,8 @@ import {
 } from './queries';
 import {
   UPDATE_ORDER_STATUS,
+  UPDATE_ORDER,
+  DELETE_ORDER,
   CREATE_ORDER,
   CREATE_PRODUCT,
   UPDATE_PRODUCT,
@@ -37,9 +39,9 @@ export const useUserAnalytics = (userId) => {
   });
 };
 
-export const useAllOrders = (page = 0, size = 20) => {
+export const useAllOrders = (filter = null, page = 0, size = 20, sortBy = 'orderDate', sortDirection = 'DESC') => {
   return useQuery(GET_ALL_ORDERS, {
-    variables: { page, size },
+    variables: { filter, page, size, sortBy, sortDirection },
     fetchPolicy: 'cache-and-network',
     errorPolicy: 'all'
   });
@@ -54,9 +56,9 @@ export const useOrderById = (orderId) => {
   });
 };
 
-export const useUserOrders = (userId, page = 0, size = 20) => {
+export const useUserOrders = (userId, filter = null, page = 0, size = 20, sortBy = 'orderDate', sortDirection = 'DESC') => {
   return useQuery(GET_USER_ORDERS, {
-    variables: { userId, page, size },
+    variables: { userId, filter, page, size, sortBy, sortDirection },
     skip: !userId,
     fetchPolicy: 'cache-and-network',
     errorPolicy: 'all'
@@ -89,6 +91,20 @@ export const useLowStockProducts = () => {
 export const useUpdateOrderStatus = () => {
   return useMutation(UPDATE_ORDER_STATUS, {
     refetchQueries: [{ query: GET_ALL_ORDERS }],
+    awaitRefetchQueries: true
+  });
+};
+
+export const useUpdateOrder = () => {
+  return useMutation(UPDATE_ORDER, {
+    refetchQueries: [{ query: GET_ALL_ORDERS }, { query: GET_USER_ORDERS }],
+    awaitRefetchQueries: true
+  });
+};
+
+export const useDeleteOrder = () => {
+  return useMutation(DELETE_ORDER, {
+    refetchQueries: [{ query: GET_ALL_ORDERS }, { query: GET_USER_ORDERS }],
     awaitRefetchQueries: true
   });
 };
@@ -274,8 +290,7 @@ export const transformUserAnalytics = (data) => {
   orders.orders.forEach(order => {
     if (order.status === 'DELIVERED' && order.orderItems) {
       order.orderItems.forEach(item => {
-        // We don't have category info in order items, so we'll create mock data for now
-        const category = 'General';
+        const category = item.categoryName || 'General';
         if (!spendingByCategory[category]) {
           spendingByCategory[category] = { categoryName: category, amountSpent: 0 };
         }

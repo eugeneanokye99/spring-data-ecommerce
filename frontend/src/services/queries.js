@@ -46,6 +46,7 @@ export const GET_DASHBOARD_ANALYTICS = gql`
           orderItemId
           productId
           productName
+          categoryName
           quantity
           unitPrice
           subtotal
@@ -68,7 +69,7 @@ export const GET_DASHBOARD_ANALYTICS = gql`
 `;
 
 export const GET_USER_ANALYTICS = gql`
-  query GetUserAnalytics($userId: ID!) {
+  query GetUserAnalytics($userId: ID) {
     orders(userId: $userId) {
       orders {
         orderId
@@ -81,6 +82,7 @@ export const GET_USER_ANALYTICS = gql`
           orderItemId
           productId
           productName
+          categoryName
           quantity
           unitPrice
           subtotal
@@ -119,8 +121,8 @@ export const GET_USER_ANALYTICS = gql`
 
 // Order Queries
 export const GET_ALL_ORDERS = gql`
-  query GetAllOrders($page: Int, $size: Int) {
-    orders(page: $page, size: $size) {
+  query GetAllOrders($filter: OrderFilterInput, $page: Int, $size: Int, $sortBy: String, $sortDirection: String) {
+    orders(filter: $filter, page: $page, size: $size, sortBy: $sortBy, sortDirection: $sortDirection) {
       orders {
         orderId
         userId
@@ -186,8 +188,8 @@ export const GET_ORDER_BY_ID = gql`
 `;
 
 export const GET_USER_ORDERS = gql`
-  query GetUserOrders($userId: ID!, $page: Int, $size: Int) {
-    orders(userId: $userId, page: $page, size: $size) {
+  query GetUserOrders($userId: ID, $filter: OrderFilterInput, $page: Int, $size: Int, $sortBy: String, $sortDirection: String) {
+    orders(userId: $userId, filter: $filter, page: $page, size: $size, sortBy: $sortBy, sortDirection: $sortDirection) {
       orders {
         orderId
         totalAmount

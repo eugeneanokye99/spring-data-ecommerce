@@ -4,6 +4,7 @@ import com.shopjoy.dto.mapper.GraphQLMapperStruct;
 import com.shopjoy.dto.response.OrderResponse;
 import com.shopjoy.entity.OrderStatus;
 import com.shopjoy.graphql.input.CreateOrderInput;
+import com.shopjoy.graphql.input.UpdateOrderInput;
 import com.shopjoy.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
@@ -25,8 +26,25 @@ public class OrderMutationResolver {
     }
 
     @MutationMapping
+    public OrderResponse updateOrder(@Argument Long id, @Argument @Valid UpdateOrderInput input) {
+        var request = graphQLMapper.toUpdateOrderRequest(input);
+        return orderService.updateOrder(id.intValue(), request);
+    }
+
+    @MutationMapping
+    public Boolean deleteOrder(@Argument Long id) {
+        orderService.deleteOrder(id.intValue());
+        return true;
+    }
+
+    @MutationMapping
     public OrderResponse updateOrderStatus(@Argument Long id, @Argument String status) {
         OrderStatus orderStatus = OrderStatus.valueOf(status);
         return orderService.updateOrderStatus(id.intValue(), orderStatus);
+    }
+
+    @MutationMapping
+    public OrderResponse simulatePayment(@Argument Long id, @Argument String transactionId) {
+        return orderService.simulatePayment(id.intValue(), transactionId);
     }
 }

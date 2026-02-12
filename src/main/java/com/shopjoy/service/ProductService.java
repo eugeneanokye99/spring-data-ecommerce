@@ -5,8 +5,8 @@ import com.shopjoy.dto.request.CreateProductRequest;
 import com.shopjoy.dto.request.UpdateProductRequest;
 import com.shopjoy.dto.response.ProductResponse;
 import com.shopjoy.entity.Product;
-import com.shopjoy.util.Page;
-import com.shopjoy.util.Pageable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -32,6 +32,15 @@ public interface ProductService {
     ProductResponse getProductById(Integer productId);
 
     /**
+     * Retrieves multiple products by their IDs in a single batch.
+     * Useful for optimizing GraphQL N+1 queries.
+     * 
+     * @param productIds list of product IDs to retrieve
+     * @return list of product response DTOs
+     */
+    List<ProductResponse> getProductsByIds(List<Integer> productIds);
+
+    /**
      * Gets all products.
      *
      * @return the all products
@@ -52,6 +61,14 @@ public interface ProductService {
      * @return the products by category
      */
     List<ProductResponse> getProductsByCategory(Integer categoryId);
+
+    /**
+     * Retrieves products for multiple categories in a single batch.
+     * 
+     * @param categoryIds list of category IDs
+     * @return list of product response DTOs
+     */
+    List<ProductResponse> getProductsByCategories(List<Integer> categoryIds);
 
     /**
      * Search products by name list.

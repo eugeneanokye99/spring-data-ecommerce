@@ -1,13 +1,11 @@
 package com.shopjoy.entity;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.BatchSize;
 
 import java.io.Serial;
 import java.io.Serializable;
-import java.time.LocalDateTime;
 
 /**
  * The type Cart item.
@@ -16,15 +14,37 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Entity
+@Table(name = "cart_items")
+@BatchSize(size = 20)
 public class CartItem implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
 
-    private int cartItemId;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "cart_item_id")
+    private Integer cartItemId;
+
+    @Column(name = "user_id", nullable = false)
     private int userId;
+
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", insertable = false, updatable = false)
+    private User user;
+
+    @Column(name = "product_id", nullable = false)
     private int productId;
-    private int quantity;
-    private LocalDateTime createdAt;
+
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "product_id", insertable = false, updatable = false)
     private Product product;
+
+    @Column(name = "quantity", nullable = false)
+    private int quantity;
 }

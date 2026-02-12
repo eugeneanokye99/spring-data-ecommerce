@@ -15,7 +15,9 @@ import com.shopjoy.repository.UserRepository;
 import com.shopjoy.service.UserService;
 import lombok.AllArgsConstructor;
 import org.mindrot.jbcrypt.BCrypt;
-
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,20 +38,22 @@ public class UserServiceImpl implements UserService {
     private final UserMapperStruct userMapper;
 
     @Override
-    @Transactional()
+    @Transactional(readOnly = false)
     @Auditable(action = "USER_REGISTRATION", description = "Registering new user")
     public UserResponse registerUser(CreateUserRequest request) {
         validateCreateUserRequest(request);
 
-        if (userRepository.usernameExists(request.getUsername())) {
+        if (userRepository.existsByUsername(request.getUsername())) {
             throw new DuplicateResourceException("User", "username", request.getUsername());
         }
 
-        if (userRepository.emailExists(request.getEmail())) {
+        if (userRepository.existsByEmail(request.getEmail())) {
             throw new DuplicateResourceException("User", "email", request.getEmail());
         }
 
         User user = userMapper.toUser(request);
+        // Hash the password with BCrypt before saving
+        user.setPasswordHash(BCrypt.hashpw(request.getPassword(), BCrypt.gensalt()));
         user.setCreatedAt(LocalDateTime.now());
         user.setUpdatedAt(LocalDateTime.now());
 
@@ -59,21 +63,23 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    @Transactional()
+    @Transactional(readOnly = false)
     @Auditable(action = "USER_REGISTRATION", description = "Registering new user with specific type")
     public UserResponse registerUser(CreateUserRequest request, UserType userType) {
         validateCreateUserRequest(request);
 
-        if (userRepository.usernameExists(request.getUsername())) {
+        if (userRepository.existsByUsername(request.getUsername())) {
             throw new DuplicateResourceException("User", "username", request.getUsername());
         }
 
-        if (userRepository.emailExists(request.getEmail())) {
+        if (userRepository.existsByEmail(request.getEmail())) {
             throw new DuplicateResourceException("User", "email", request.getEmail());
         }
 
         // Use the mapper method that accepts userType parameter
         User user = userMapper.toUser(request, userType);
+        // Hash the password with BCrypt before saving
+        user.setPasswordHash(BCrypt.hashpw(request.getPassword(), BCrypt.gensalt()));
         user.setCreatedAt(LocalDateTime.now());
         user.setUpdatedAt(LocalDateTime.now());
 
@@ -92,16 +98,24 @@ public class UserServiceImpl implements UserService {
             throw new ValidationException("Password cannot be empty");
         }
 
-        Optional<User> userOpt = userRepository.authenticate(username, password);
+        Optional<User> userOpt = userRepository.findByUsername(username);
 
         if (userOpt.isEmpty()) {
             throw new AuthenticationException();
         }
 
-        return userMapper.toUserResponse(userOpt.get());
+        User user = userOpt.get();
+        
+        // Verify password using BCrypt
+        if (!BCrypt.checkpw(password, user.getPasswordHash())) {
+            throw new AuthenticationException();
+        }
+
+        return userMapper.toUserResponse(user);
     }
 
     @Override
+    @Cacheable(value = "userProfile", key = "#userId", unless = "#result == null")
     public UserResponse getUserById(Integer userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
@@ -109,12 +123,33 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Cacheable(value = "usersByIds")
+    public List<UserResponse> getUsersByIds(List<Integer> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        
+        // Remove duplicates and call repository
+        List<Integer> distinctIds = userIds.stream()
+                .distinct()
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        
+        List<User> users = userRepository.findAllById(distinctIds);
+        return users.stream()
+                .map(userMapper::toUserResponse)
+                .toList();
+    }
+
+    @Override
+    @Cacheable(value = "userProfileEmail", key = "#email", unless = "#result == null")
     public Optional<UserResponse> getUserByEmail(String email) {
         return userRepository.findByEmail(email)
                 .map(userMapper::toUserResponse);
     }
 
     @Override
+    @Cacheable(value = "userProfileUsername", key = "#username", unless = "#result == null")
     public Optional<UserResponse> getUserByUsername(String username) {
         return userRepository.findByUsername(username)
                 .map(userMapper::toUserResponse);
@@ -139,6 +174,9 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional()
+    @Caching(evict = {
+        @CacheEvict(value = {"userProfile", "userProfileEmail", "userProfileUsername", "usersByIds"}, allEntries = true)
+    })
     public UserResponse updateUserProfile(Integer userId, UpdateUserRequest request) {
         User existingUser = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
@@ -146,7 +184,7 @@ public class UserServiceImpl implements UserService {
         validateUpdateUserRequest(request);
 
         if (request.getEmail() != null && !existingUser.getEmail().equals(request.getEmail())) {
-            if (userRepository.emailExists(request.getEmail())) {
+            if (userRepository.existsByEmail(request.getEmail())) {
                 throw new DuplicateResourceException("User", "email", request.getEmail());
             }
         }
@@ -155,7 +193,7 @@ public class UserServiceImpl implements UserService {
         userMapper.updateUserFromRequest(request, existingUser);
         existingUser.setUpdatedAt(LocalDateTime.now());
 
-        User updatedUser = userRepository.update(existingUser);
+        User updatedUser = userRepository.save(existingUser);
 
         return userMapper.toUserResponse(updatedUser);
     }
@@ -172,27 +210,32 @@ public class UserServiceImpl implements UserService {
 
         validatePassword(newPassword);
 
-        userRepository.changePassword(userId, newPassword);
+        // Hash the new password before saving
+        String hashedNewPassword = BCrypt.hashpw(newPassword, BCrypt.gensalt());
+        userRepository.changePassword(userId, hashedNewPassword);
     }
 
     @Override
     @Transactional()
+    @Caching(evict = {
+        @CacheEvict(value = {"userProfile", "userProfileEmail", "userProfileUsername", "usersByIds"}, allEntries = true)
+    })
     public void deleteUser(Integer userId) {
         if (!userRepository.existsById(userId)) {
             throw new ResourceNotFoundException("User", "id", userId);
         }
 
-        userRepository.delete(userId);
+        userRepository.deleteById(userId);
     }
 
     @Override
     public boolean isEmailTaken(String email) {
-        return userRepository.emailExists(email);
+        return userRepository.existsByEmail(email);
     }
 
     @Override
     public boolean isUsernameTaken(String username) {
-        return userRepository.usernameExists(username);
+        return userRepository.existsByUsername(username);
     }
 
     private void validateCreateUserRequest(CreateUserRequest request) {
