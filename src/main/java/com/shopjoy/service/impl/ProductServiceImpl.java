@@ -17,6 +17,9 @@ import com.shopjoy.util.ProductComparators;
 import com.shopjoy.util.SearchAlgorithms;
 import com.shopjoy.util.SortingAlgorithms;
 import lombok.AllArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -91,6 +94,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional()
+    @CacheEvict(value = {"products", "activeProducts", "productsByCategory"}, allEntries = true)
     public ProductResponse createProduct(CreateProductRequest request) {
         Product product = productMapper.toProduct(request);
         product.setCreatedAt(LocalDateTime.now());
@@ -114,6 +118,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Cacheable(value = "product", key = "#productId", unless = "#result == null")
     public ProductResponse getProductById(Integer productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
@@ -121,6 +126,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Cacheable(value = "products")
     public List<ProductResponse> getProductsByIds(List<Integer> productIds) {
         if (productIds == null || productIds.isEmpty()) {
             return java.util.Collections.emptyList();
@@ -136,11 +142,13 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Cacheable(value = "products")
     public List<ProductResponse> getAllProducts() {
         return convertToResponses(productRepository.findAll());
     }
 
     @Override
+    @Cacheable(value = "activeProducts")
     public List<ProductResponse> getActiveProducts() {
         List<Product> activeProducts = productRepository.findAll().stream()
                 .filter(Product::isActive)
@@ -149,6 +157,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Cacheable(value = "productsByCategory", key = "#categoryId")
     public List<ProductResponse> getProductsByCategory(Integer categoryId) {
         if (categoryId == null) {
             throw new ValidationException("Category ID cannot be null");
@@ -157,12 +166,14 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Cacheable(value = "productsByCategory")
     public List<ProductResponse> getProductsByCategories(List<Integer> categoryIds) {
         if (categoryIds == null || categoryIds.isEmpty()) {
             return java.util.Collections.emptyList();
         }
         return convertToResponses(productRepository.findByCategoryIdIn(categoryIds));
     }
+ 
 
     @Override
     public List<ProductResponse> searchProductsByName(String keyword) {
@@ -185,6 +196,10 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional()
+    @Caching(evict = {
+        @CacheEvict(value = "product", key = "#productId"),
+        @CacheEvict(value = {"products", "activeProducts", "productsByCategory"}, allEntries = true)
+    })
     public ProductResponse updateProduct(Integer productId, UpdateProductRequest request) {
         Product existingProduct = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
@@ -202,6 +217,10 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional()
     @Auditable(action = "UPDATE_PRICE", description = "Updating product price")
+    @Caching(evict = {
+        @CacheEvict(value = "product", key = "#productId"),
+        @CacheEvict(value = {"products", "activeProducts", "productsByCategory"}, allEntries = true)
+    })
     public ProductResponse updateProductPrice(Integer productId, double newPrice) {
         if (newPrice < 0) {
             throw new ValidationException("price", "must not be negative");
@@ -219,6 +238,10 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional()
+    @Caching(evict = {
+        @CacheEvict(value = "product", key = "#productId"),
+        @CacheEvict(value = {"products", "activeProducts", "productsByCategory"}, allEntries = true)
+    })
     public ProductResponse activateProduct(Integer productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
@@ -230,6 +253,10 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional()
+    @Caching(evict = {
+        @CacheEvict(value = "product", key = "#productId"),
+        @CacheEvict(value = {"products", "activeProducts", "productsByCategory"}, allEntries = true)
+    })
     public ProductResponse deactivateProduct(Integer productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
@@ -241,6 +268,10 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional()
+    @Caching(evict = {
+        @CacheEvict(value = "product", key = "#productId"),
+        @CacheEvict(value = {"products", "activeProducts", "productsByCategory"}, allEntries = true)
+    })
     public void deleteProduct(Integer productId) {
         if (!productRepository.existsById(productId)) {
             throw new ResourceNotFoundException("Product", "id", productId);

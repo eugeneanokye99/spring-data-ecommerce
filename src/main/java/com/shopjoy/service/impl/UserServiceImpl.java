@@ -15,7 +15,9 @@ import com.shopjoy.repository.UserRepository;
 import com.shopjoy.service.UserService;
 import lombok.AllArgsConstructor;
 import org.mindrot.jbcrypt.BCrypt;
-
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -113,6 +115,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Cacheable(value = "userProfile", key = "#userId", unless = "#result == null")
     public UserResponse getUserById(Integer userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
@@ -120,6 +123,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Cacheable(value = "usersByIds")
     public List<UserResponse> getUsersByIds(List<Integer> userIds) {
         if (userIds == null || userIds.isEmpty()) {
             return java.util.Collections.emptyList();
@@ -138,12 +142,14 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Cacheable(value = "userProfileEmail", key = "#email", unless = "#result == null")
     public Optional<UserResponse> getUserByEmail(String email) {
         return userRepository.findByEmail(email)
                 .map(userMapper::toUserResponse);
     }
 
     @Override
+    @Cacheable(value = "userProfileUsername", key = "#username", unless = "#result == null")
     public Optional<UserResponse> getUserByUsername(String username) {
         return userRepository.findByUsername(username)
                 .map(userMapper::toUserResponse);
@@ -168,6 +174,9 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional()
+    @Caching(evict = {
+        @CacheEvict(value = {"userProfile", "userProfileEmail", "userProfileUsername", "usersByIds"}, allEntries = true)
+    })
     public UserResponse updateUserProfile(Integer userId, UpdateUserRequest request) {
         User existingUser = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
@@ -208,6 +217,9 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional()
+    @Caching(evict = {
+        @CacheEvict(value = {"userProfile", "userProfileEmail", "userProfileUsername", "usersByIds"}, allEntries = true)
+    })
     public void deleteUser(Integer userId) {
         if (!userRepository.existsById(userId)) {
             throw new ResourceNotFoundException("User", "id", userId);

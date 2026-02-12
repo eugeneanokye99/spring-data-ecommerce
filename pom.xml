@@ -79,6 +79,13 @@
 			<version>0.4</version>
 		</dependency>
 
+		<!-- Spring Boot Starter Cache -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-cache</artifactId>
+		</dependency>
+
+
 		<!-- GraphQL -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

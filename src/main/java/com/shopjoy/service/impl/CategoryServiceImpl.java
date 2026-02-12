@@ -13,6 +13,9 @@ import com.shopjoy.service.CategoryService;
 import com.shopjoy.service.ProductService;
 
 import lombok.AllArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +37,7 @@ public class CategoryServiceImpl implements CategoryService {
     
     @Override
     @Transactional()
+    @CacheEvict(value = {"categories", "topLevelCategories"}, allEntries = true)
     public CategoryResponse createCategory(CreateCategoryRequest request) {
         Category category = categoryMapper.toCategory(request);
         
@@ -51,6 +55,7 @@ public class CategoryServiceImpl implements CategoryService {
     }
     
     @Override
+    @Cacheable(value = "category", key = "#categoryId", unless = "#result == null")
     public CategoryResponse getCategoryById(Integer categoryId) {
         Category category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "id", categoryId));
@@ -58,6 +63,7 @@ public class CategoryServiceImpl implements CategoryService {
     }
     
     @Override
+    @Cacheable(value = "categories")
     public List<CategoryResponse> getCategoriesByIds(List<Integer> categoryIds) {
         if (categoryIds == null || categoryIds.isEmpty()) {
             return java.util.Collections.emptyList();
@@ -75,6 +81,7 @@ public class CategoryServiceImpl implements CategoryService {
     }
     
     @Override
+    @Cacheable(value = "categories")
     public List<CategoryResponse> getAllCategories() {
         return categoryRepository.findAll().stream()
                 .map(categoryMapper::toCategoryResponse)
@@ -82,6 +89,7 @@ public class CategoryServiceImpl implements CategoryService {
     }
     
     @Override
+    @Cacheable(value = "topLevelCategories")
     public List<CategoryResponse> getTopLevelCategories() {
         return categoryRepository.findTopLevelCategories().stream()
                 .map(categoryMapper::toCategoryResponse)
@@ -89,6 +97,7 @@ public class CategoryServiceImpl implements CategoryService {
     }
     
     @Override
+    @Cacheable(value = "subcategories", key = "#parentCategoryId")
     public List<CategoryResponse> getSubcategories(Integer parentCategoryId) {
         if (parentCategoryId == null) {
             throw new ValidationException("Parent category ID cannot be null");
@@ -108,6 +117,10 @@ public class CategoryServiceImpl implements CategoryService {
     
     @Override
     @Transactional()
+    @Caching(evict = {
+        @CacheEvict(value = "category", key = "#categoryId"),
+        @CacheEvict(value = {"categories", "topLevelCategories", "subcategories"}, allEntries = true)
+    })
     public CategoryResponse updateCategory(Integer categoryId, UpdateCategoryRequest request) {
         Category category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "id", categoryId));
@@ -132,6 +145,10 @@ public class CategoryServiceImpl implements CategoryService {
     
     @Override
     @Transactional()
+    @Caching(evict = {
+        @CacheEvict(value = "category", key = "#categoryId"),
+        @CacheEvict(value = {"categories", "topLevelCategories", "subcategories"}, allEntries = true)
+    })
     public void deleteCategory(Integer categoryId) {
         if (!categoryRepository.existsById(categoryId)) {
             throw new ResourceNotFoundException("Category", "id", categoryId);
@@ -152,6 +169,10 @@ public class CategoryServiceImpl implements CategoryService {
     
     @Override
     @Transactional()
+    @Caching(evict = {
+        @CacheEvict(value = "category", key = "#categoryId"),
+        @CacheEvict(value = {"categories", "topLevelCategories", "subcategories"}, allEntries = true)
+    })
     public CategoryResponse moveCategory(Integer categoryId, Integer newParentId) {
         Category category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "id", categoryId));
