@@ -17,6 +17,8 @@ import com.shopjoy.exception.ResourceNotFoundException;
 import com.shopjoy.exception.ValidationException;
 import com.shopjoy.repository.OrderItemRepository;
 import com.shopjoy.repository.OrderRepository;
+import com.shopjoy.repository.UserRepository;
+import com.shopjoy.repository.ProductRepository;
 import com.shopjoy.specification.OrderSpecification;
 import com.shopjoy.service.InventoryService;
 import com.shopjoy.service.OrderService;
@@ -31,8 +33,11 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -44,6 +49,8 @@ public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
+    private final UserRepository userRepository;
+    private final ProductRepository productRepository;
     private final InventoryService inventoryService;
     private final ProductService productService;
     private final UserService userService;
@@ -54,6 +61,8 @@ public class OrderServiceImpl implements OrderService {
      *
      * @param orderRepository     the order repository
      * @param orderItemRepository the order item repository
+     * @param userRepository      the user repository
+     * @param productRepository   the product repository
      * @param inventoryService    the inventory service
      * @param productService      the product service
      * @param userService         the user service
@@ -61,33 +70,23 @@ public class OrderServiceImpl implements OrderService {
      */
     public OrderServiceImpl(OrderRepository orderRepository,
             OrderItemRepository orderItemRepository,
+            UserRepository userRepository,
+            ProductRepository productRepository,
             InventoryService inventoryService,
             ProductService productService,
             UserService userService,
             OrderMapperStruct orderMapper) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
+        this.userRepository = userRepository;
+        this.productRepository = productRepository;
         this.inventoryService = inventoryService;
         this.productService = productService;
         this.userService = userService;
         this.orderMapper = orderMapper;
     }
 
-    /**
-     * COMPLEX TRANSACTION EXAMPLE
-     * <p>
-     * This method demonstrates a multi-entity transaction:
-     * 1. Validates user exists
-     * 2. Validates all products exist and are active
-     * 3. Checks inventory availability for all items
-     * 4. Reserves inventory (decreases stock)
-     * 5. Creates order
-     * 6. Creates order items
-     * <p>
-     * If ANY step fails (e.g. InsufficientStockException), the entire transaction 
-     * including inventory reservations and order record creation will be rolled back.
-     * Uses SERIALIZABLE isolation to prevent phantom reads during the stock check-and-reserve phase.
-     */
+
     @Override
     @Transactional(isolation = Isolation.SERIALIZABLE, propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
     public OrderResponse createOrder(CreateOrderRequest request) {
@@ -102,14 +101,14 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // Fetch all products once and cache them
-        java.util.Map<Integer, ProductResponse> productCache = new java.util.HashMap<>();
+        Map<Integer, ProductResponse> productCache = new HashMap<>();
         for (CreateOrderItemRequest itemReq : request.getOrderItems()) {
             ProductResponse product = productService.getProductById(itemReq.getProductId());
             productCache.put(itemReq.getProductId(), product);
         }
 
         // Validate products and inventory
-        java.math.BigDecimal totalAmount = java.math.BigDecimal.ZERO;
+        BigDecimal totalAmount = BigDecimal.ZERO;
         for (CreateOrderItemRequest itemReq : request.getOrderItems()) {
             ProductResponse product = productCache.get(itemReq.getProductId());
             if (!product.isActive()) {
@@ -119,8 +118,8 @@ public class OrderServiceImpl implements OrderService {
                 throw new ValidationException("Insufficient stock for product: " + product.getProductName());
             }
             // Calculate total amount from actual product prices
-            java.math.BigDecimal itemTotal = java.math.BigDecimal.valueOf(product.getPrice())
-                    .multiply(java.math.BigDecimal.valueOf(itemReq.getQuantity()));
+            BigDecimal itemTotal = BigDecimal.valueOf(product.getPrice())
+                    .multiply(BigDecimal.valueOf(itemReq.getQuantity()));
             totalAmount = totalAmount.add(itemTotal);
         }
 
@@ -131,6 +130,7 @@ public class OrderServiceImpl implements OrderService {
 
         // Create the order
         Order order = orderMapper.toOrder(request);
+        order.setUser(userRepository.getReferenceById(request.getUserId()));
         order.setTotalAmount(totalAmount);
         order.setOrderDate(LocalDateTime.now());
         order.setStatus(OrderStatus.PENDING);
@@ -150,12 +150,12 @@ public class OrderServiceImpl implements OrderService {
         // Create order items using cached product prices and link to the saved order
         for (CreateOrderItemRequest itemReq : request.getOrderItems()) {
             ProductResponse product = productCache.get(itemReq.getProductId());
-            java.math.BigDecimal unitPrice = java.math.BigDecimal.valueOf(product.getPrice());
-            java.math.BigDecimal subtotal = unitPrice.multiply(java.math.BigDecimal.valueOf(itemReq.getQuantity()));
+            BigDecimal unitPrice = BigDecimal.valueOf(product.getPrice());
+            BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(itemReq.getQuantity()));
             
             OrderItem orderItem = OrderItem.builder()
-                    .orderId(createdOrder.getOrderId())
-                    .productId(itemReq.getProductId())
+                    .order(createdOrder)
+                    .product(productRepository.getReferenceById(itemReq.getProductId()))
                     .quantity(itemReq.getQuantity())
                     .unitPrice(unitPrice)
                     .subtotal(subtotal)
@@ -165,7 +165,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // Return refreshed order with items
-        return getOrderById(createdOrder.getOrderId());
+        return getOrderById(createdOrder.getId());
     }
 
     @Override
@@ -337,17 +337,7 @@ public class OrderServiceImpl implements OrderService {
         return updateOrderStatus(orderId, OrderStatus.DELIVERED);
     }
 
-    /**
-     * COMPLEX ROLLBACK SCENARIO - Order Cancellation
-     * <p>
-     * When cancelling an order, we must:
-     * 1. Validate order can be canceled
-     * 2. Release reserved inventory back to stock (Atomic operation)
-     * 3. Update order status
-     * <p>
-     * If inventory release fails for any item, the status update will be rolled back,
-     * ensuring the order doesn't appear cancelled while stock is still missing.
-     */
+
     @Override
     @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
     public OrderResponse cancelOrder(Integer orderId) {
@@ -361,10 +351,10 @@ public class OrderServiceImpl implements OrderService {
                     "cancel (can only cancel PENDING or PROCESSING orders)");
         }
 
-        List<OrderItem> orderItems = orderItemRepository.findByOrderId(orderId);
+        List<OrderItem> orderItems = orderItemRepository.findByOrder_Id(orderId);
 
         for (OrderItem item : orderItems) {
-            inventoryService.releaseStock(item.getProductId(), item.getQuantity());
+            inventoryService.releaseStock(item.getProduct().getId(), item.getQuantity());
         }
 
         order.setStatus(OrderStatus.CANCELLED);
@@ -412,16 +402,16 @@ public OrderResponse updateOrder(Integer orderId, UpdateOrderRequest request) {
 
     // Handle order items if provided
     if (request.getOrderItems() != null && !request.getOrderItems().isEmpty()) {
-        List<OrderItem> existingItems = orderItemRepository.findByOrderId(orderId);
+        List<OrderItem> existingItems = orderItemRepository.findByOrder_Id(orderId);
         
         // Release inventory for old items
         for (OrderItem item : existingItems) {
-            inventoryService.releaseStock(item.getProductId(), item.getQuantity());
+            inventoryService.releaseStock(item.getProduct().getId(), item.getQuantity());
         }
 
         // Delete old items
         for (OrderItem item : existingItems) {
-            orderItemRepository.deleteById(item.getOrderItemId());
+            orderItemRepository.deleteById(item.getId());
         }
 
         // Validate and reserve inventory for new items
@@ -441,18 +431,18 @@ public OrderResponse updateOrder(Integer orderId, UpdateOrderRequest request) {
         // Create new order items
         for (UpdateOrderItemRequest itemReq : request.getOrderItems()) {
             OrderItem orderItem = OrderItem.builder()
-                    .orderId(orderId)
-                    .productId(itemReq.getProductId())
+                    .order(order)
+                    .product(productRepository.getReferenceById(itemReq.getProductId()))
                     .quantity(itemReq.getQuantity())
-                    .unitPrice(new java.math.BigDecimal(itemReq.getPrice().toString()))
-                    .subtotal(new java.math.BigDecimal(itemReq.getQuantity() * itemReq.getPrice()))
+                    .unitPrice(new BigDecimal(itemReq.getPrice().toString()))
+                    .subtotal(new BigDecimal(itemReq.getQuantity() * itemReq.getPrice()))
                     .createdAt(LocalDateTime.now())
                     .build();
             orderItemRepository.save(orderItem);
         }
 
         // Update total amount
-        order.setTotalAmount(new java.math.BigDecimal(newTotal));
+        order.setTotalAmount(new BigDecimal(newTotal));
     }
 
     order.setUpdatedAt(LocalDateTime.now());

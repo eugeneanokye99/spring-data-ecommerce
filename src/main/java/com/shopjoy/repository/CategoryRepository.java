@@ -9,9 +9,9 @@ import java.util.List;
 @Repository
 public interface CategoryRepository extends JpaRepository<Category, Integer> {
     
-    List<Category> findByParentCategoryIdIsNull();
+    List<Category> findByParentCategoryIsNull();
     
-    List<Category> findByParentCategoryId(Integer parentCategoryId);
+    List<Category> findByParentCategory_Id(Integer parentCategoryId);
     
-    boolean existsByParentCategoryId(int categoryId);
+    boolean existsByParentCategory_Id(int categoryId);
 }

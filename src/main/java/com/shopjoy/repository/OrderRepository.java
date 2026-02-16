@@ -15,8 +15,8 @@ import java.util.List;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Integer>, JpaSpecificationExecutor<Order> {
-    List<Order> findByUserId(int userId);
-    Page<Order> findByUserId(int userId, Pageable pageable);
+    List<Order> findByUser_Id(int userId);
+    Page<Order> findByUser_Id(int userId, Pageable pageable);
     
     List<Order> findByStatus(OrderStatus status);
     Page<Order> findByStatus(OrderStatus status, Pageable pageable);
@@ -26,6 +26,6 @@ public interface OrderRepository extends JpaRepository<Order, Integer>, JpaSpeci
     Page<Order> findByOrderDateBetween(LocalDateTime startDate, LocalDateTime endDate, Pageable pageable);
     
     @Query("SELECT CASE WHEN COUNT(oi) > 0 THEN true ELSE false END FROM OrderItem oi " +
-           "JOIN oi.order o WHERE o.userId = :userId AND oi.productId = :productId AND o.status <> 'CANCELLED'")
+           "JOIN oi.order o WHERE o.user.id = :userId AND oi.product.id = :productId AND o.status <> 'CANCELLED'")
     boolean hasUserPurchasedProduct(@Param("userId") int userId, @Param("productId") int productId);
 }

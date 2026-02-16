@@ -10,10 +10,10 @@ import java.util.Optional;
 
 @Repository
 public interface InventoryRepository extends JpaRepository<Inventory, Integer> {
-    Optional<Inventory> findByProductId(int productId);
+    Optional<Inventory> findByProduct_Id(int productId);
     
     @Query("SELECT i FROM Inventory i WHERE i.quantityInStock <= i.reorderLevel")
     List<Inventory> findLowStock();
     
-    List<Inventory> findByProductIdIn(List<Integer> productIds);
+    List<Inventory> findByProduct_IdIn(List<Integer> productIds);
 }

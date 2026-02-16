@@ -71,12 +71,12 @@ public class OrderSpecification {
                     
                     // Search in order ID safely
                     if (searchTerm.matches("\\d+")) {
-                        searchPredicates.add(cb.equal(root.get("orderId"), Integer.parseInt(searchTerm)));
+                        searchPredicates.add(cb.equal(root.get("id"), Integer.parseInt(searchTerm)));
                     }
                     
                     // Partial ID search - using CONCAT function for database portability (Postgres integer vs text)
                     // This avoids the "operator does not exist: integer ~~ text" error in PostgreSQL
-                    searchPredicates.add(cb.like(cb.function("CONCAT", String.class, root.get("orderId"), cb.literal("")), pattern));
+                    searchPredicates.add(cb.like(cb.function("CONCAT", String.class, root.get("id"), cb.literal("")), pattern));
                     
                     predicates.add(cb.or(searchPredicates.toArray(new Predicate[0])));
                 }

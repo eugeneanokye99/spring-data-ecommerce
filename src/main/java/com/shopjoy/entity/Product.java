@@ -30,7 +30,7 @@ public class Product implements Serializable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "product_id")
-    private Integer productId;
+    private Integer id;
 
     @Column(name = "product_name", nullable = false, length = 200)
     private String productName;
@@ -38,11 +38,8 @@ public class Product implements Serializable {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "category_id", nullable = false)
-    private int categoryId;
-
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id", insertable = false, updatable = false)
+    @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
     @Column(name = "price", nullable = false)

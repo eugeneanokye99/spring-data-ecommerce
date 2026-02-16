@@ -13,15 +13,15 @@ import java.util.List;
 
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Integer>, JpaSpecificationExecutor<Product> {
-    List<Product> findByCategoryId(Integer categoryId);
+    List<Product> findByCategory_Id(Integer categoryId);
 
-    List<Product> findByCategoryIdIn(List<Integer> categoryIds);
+    List<Product> findByCategory_IdIn(List<Integer> categoryIds);
     
     List<Product> findByProductNameContainingIgnoreCase(String keyword);
     
     List<Product> findByPriceBetween(double minPrice, double maxPrice);
     
-    long countByCategoryId(Integer categoryId);
+    long countByCategory_Id(Integer categoryId);
     
     Page<Product> findByProductNameContainingIgnoreCaseOrDescriptionContainingIgnoreCase(String productName, String description, Pageable pageable);
     
@@ -30,7 +30,7 @@ public interface ProductRepository extends JpaRepository<Product, Integer>, JpaS
     
     @Query("SELECT p FROM Product p WHERE " +
            "(COALESCE(:searchTerm, '') = '' OR LOWER(p.productName) LIKE LOWER(CONCAT('%', COALESCE(:searchTerm, ''), '%')) OR LOWER(p.description) LIKE LOWER(CONCAT('%', COALESCE(:searchTerm, ''), '%'))) AND " +
-           "(:categoryId IS NULL OR p.categoryId = :categoryId) AND " +
+           "(:categoryId IS NULL OR p.category.id = :categoryId) AND " +
            "(:minPrice IS NULL OR p.price >= :minPrice) AND " +
            "(:maxPrice IS NULL OR p.price <= :maxPrice) AND " +
            "(:brand IS NULL OR p.brand = :brand) AND " +
@@ -46,7 +46,7 @@ public interface ProductRepository extends JpaRepository<Product, Integer>, JpaS
     
     @Query("SELECT p FROM Product p WHERE " +
            "(COALESCE(:searchTerm, '') = '' OR LOWER(p.productName) LIKE LOWER(CONCAT('%', COALESCE(:searchTerm, ''), '%')) OR LOWER(p.description) LIKE LOWER(CONCAT('%', COALESCE(:searchTerm, ''), '%'))) AND " +
-           "(:categoryId IS NULL OR p.categoryId = :categoryId) AND " +
+           "(:categoryId IS NULL OR p.category.id = :categoryId) AND " +
            "(:minPrice IS NULL OR p.price >= :minPrice) AND " +
            "(:maxPrice IS NULL OR p.price <= :maxPrice) AND " +
            "(:brand IS NULL OR p.brand = :brand) AND " +

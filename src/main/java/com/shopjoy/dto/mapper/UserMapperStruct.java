@@ -28,7 +28,7 @@ public interface UserMapperStruct {
      * @param request the create user request
      * @return the mapped user entity
      */
-    @Mapping(target = "userId", ignore = true)
+    @Mapping(target = "id", ignore = true)
     @Mapping(target = "passwordHash", source = "password")
     @Mapping(target = "userType", constant = "CUSTOMER")
     @Mapping(target = "createdAt", ignore = true)
@@ -42,7 +42,7 @@ public interface UserMapperStruct {
      * @param userType the user type to assign
      * @return the mapped user entity
      */
-    @Mapping(target = "userId", ignore = true)
+    @Mapping(target = "id", ignore = true)
     @Mapping(target = "passwordHash", source = "request.password")
     @Mapping(target = "userType", source = "userType")
     @Mapping(target = "createdAt", ignore = true)
@@ -56,6 +56,7 @@ public interface UserMapperStruct {
      * @param user the user entity
      * @return the mapped user response
      */
+    @Mapping(source = "user.id", target = "userId")
     UserResponse toUserResponse(User user);
 
     /**
@@ -73,7 +74,7 @@ public interface UserMapperStruct {
      * @param request the update request
      * @param user the existing user to update
      */
-    @Mapping(target = "userId", ignore = true)
+    @Mapping(target = "id", ignore = true)
     @Mapping(target = "username", ignore = true) // Usually not updated
     @Mapping(target = "passwordHash", ignore = true) // Password updated separately
     @Mapping(target = "userType", ignore = true) // UserType not updated via user update

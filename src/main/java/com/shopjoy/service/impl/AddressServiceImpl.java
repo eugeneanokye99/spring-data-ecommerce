@@ -7,6 +7,7 @@ import com.shopjoy.dto.response.AddressResponse;
 import com.shopjoy.entity.Address;
 import com.shopjoy.exception.ResourceNotFoundException;
 import com.shopjoy.repository.AddressRepository;
+import com.shopjoy.repository.UserRepository;
 import com.shopjoy.service.AddressService;
 
 import lombok.AllArgsConstructor;
@@ -27,12 +28,14 @@ import java.util.stream.Collectors;
 public class AddressServiceImpl implements AddressService {
     
     private final AddressRepository addressRepository;
+    private final UserRepository userRepository;
     private final AddressMapperStruct addressMapper;
     
     @Override
     @Transactional()
     public AddressResponse createAddress(CreateAddressRequest request) {
         Address address = addressMapper.toAddress(request);
+        address.setUser(userRepository.getReferenceById(request.getUserId()));
         address.setCreatedAt(LocalDateTime.now());
         Address savedAddress = addressRepository.save(address);
         return addressMapper.toAddressResponse(savedAddress);
@@ -48,7 +51,7 @@ public class AddressServiceImpl implements AddressService {
     @Override
     public List<AddressResponse> getAddressesByUser(Integer userId) {
 
-        List<Address> addresses = addressRepository.findByUserId(userId);
+        List<Address> addresses = addressRepository.findByUser_Id(userId);
         return addresses.stream()
                 .map(addressMapper::toAddressResponse)
                 .collect(Collectors.toList());
@@ -83,7 +86,7 @@ public class AddressServiceImpl implements AddressService {
                 .orElseThrow(() -> new ResourceNotFoundException("Address", "id", addressId));
         
         // Find existing default and unset it
-        addressRepository.findByUserIdAndIsDefaultTrue(address.getUserId())
+        addressRepository.findByUser_IdAndIsDefaultTrue(address.getUser().getId())
                 .ifPresent(currentDefault -> {
                     currentDefault.setDefault(false);
                     addressRepository.save(currentDefault);
@@ -96,7 +99,7 @@ public class AddressServiceImpl implements AddressService {
     
     @Override
     public AddressResponse getDefaultAddress(Integer userId) {
-        Address address = addressRepository.findByUserIdAndIsDefaultTrue(userId)
+        Address address = addressRepository.findByUser_IdAndIsDefaultTrue(userId)
                 .orElse(null);
         return address != null ? addressMapper.toAddressResponse(address) : null;
     }

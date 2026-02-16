@@ -20,7 +20,9 @@ public interface ReviewMapperStruct {
      * @param request the create review request
      * @return the review entity
      */
-    @Mapping(target = "reviewId", ignore = true)
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "user", ignore = true)
+    @Mapping(target = "product", ignore = true)
     @Mapping(target = "helpfulCount", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
@@ -33,6 +35,9 @@ public interface ReviewMapperStruct {
      * @param review the review entity
      * @return the review response
      */
+    @Mapping(source = "id", target = "reviewId")
+    @Mapping(target = "userId", source = "user.id")
+    @Mapping(target = "productId", source = "product.id")
     @Mapping(target = "userName", expression = "java(review.getUser() != null ? review.getUser().getFirstName() + \" \" + review.getUser().getLastName() : \"Unknown User\")")
     @Mapping(target = "productName", source = "product.productName")
     ReviewResponse toReviewResponse(Review review);
@@ -43,9 +48,9 @@ public interface ReviewMapperStruct {
      * @param request the update request
      * @param review the review entity to update
      */
-    @Mapping(target = "reviewId", ignore = true)
-    @Mapping(target = "userId", ignore = true)
-    @Mapping(target = "productId", ignore = true)
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "user", ignore = true)
+    @Mapping(target = "product", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "helpfulCount", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)

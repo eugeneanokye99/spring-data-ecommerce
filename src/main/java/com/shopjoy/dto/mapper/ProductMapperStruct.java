@@ -25,7 +25,8 @@ public interface ProductMapperStruct {
      * @param request the create product request
      * @return the mapped product entity
      */
-    @Mapping(target = "productId", ignore = true)
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "category", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "active", source = "isActive", defaultValue = "true")
@@ -38,14 +39,31 @@ public interface ProductMapperStruct {
      * @param product the product entity
      * @return the mapped product response
      */
+    @Mapping(target = "productId", source = "id")
+    @Mapping(target = "categoryId", source = "category.id")
     @Mapping(target = "categoryName", source = "category.categoryName")
     @Mapping(target = "stockQuantity", source = "inventory.quantityInStock")
-    @Mapping(target = "active", source = "product.active")
+    @Mapping(target = "active", source = "active")
     ProductResponse toProductResponse(Product product);
 
     /**
      * Maps Product entity to ProductResponse with explicit additional data.
      */
+    @Mapping(target = "productId", source = "product.id")
+    @Mapping(target = "categoryId", source = "product.category.id")
+    @Mapping(target = "categoryName", source = "product.category.categoryName")
+    @Mapping(target = "stockQuantity", source = "inventory.quantityInStock")
+    @Mapping(target = "active", source = "product.active")
+    ProductResponse toProductResponseWithInventory(Product product, com.shopjoy.entity.Inventory inventory);
+
+    /**
+     * Updates Product entity from UpdateProductRequest.
+     * 
+     * @param request the update request
+     * @param product the product entity to update
+     */
+    @Mapping(target = "productId", source = "product.id")
+    @Mapping(target = "categoryId", source = "product.category.id")
     @Mapping(target = "categoryName", source = "categoryName")
     @Mapping(target = "stockQuantity", source = "stockQuantity")
     @Mapping(target = "active", source = "product.active")
@@ -58,9 +76,9 @@ public interface ProductMapperStruct {
      * @param request the update request
      * @param product the existing product to update
      */
-    @Mapping(target = "productId", ignore = true)
-    @Mapping(target = "categoryId", ignore = true) // Usually not updated via product update
-    @Mapping(target = "sku", ignore = true) // Usually not updated via product update
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "category", ignore = true)
+    @Mapping(target = "sku", ignore = true) 
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "active", source = "isActive")

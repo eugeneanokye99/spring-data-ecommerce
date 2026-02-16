@@ -30,7 +30,7 @@ public class Category implements Serializable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "category_id")
-    private Integer categoryId;
+    private Integer id;
 
     @Column(name = "category_name", unique = true, nullable = false, length = 100)
     private String categoryName;
@@ -38,11 +38,8 @@ public class Category implements Serializable {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "parent_category_id")
-    private Integer parentCategoryId;
-
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "parent_category_id", insertable = false, updatable = false)
+    @JoinColumn(name = "parent_category_id")
     private Category parentCategory;
 
     @OneToMany(mappedBy = "parentCategory", cascade = CascadeType.ALL)

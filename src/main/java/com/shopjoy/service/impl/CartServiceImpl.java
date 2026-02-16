@@ -9,6 +9,8 @@ import com.shopjoy.exception.InsufficientStockException;
 import com.shopjoy.exception.ResourceNotFoundException;
 import com.shopjoy.exception.ValidationException;
 import com.shopjoy.repository.CartItemRepository;
+import com.shopjoy.repository.UserRepository;
+import com.shopjoy.repository.ProductRepository;
 import com.shopjoy.service.CartService;
 import com.shopjoy.service.InventoryService;
 import com.shopjoy.service.ProductService;
@@ -31,6 +33,8 @@ import java.util.stream.Collectors;
 public class CartServiceImpl implements CartService {
 
     private final CartItemRepository cartItemRepository;
+    private final UserRepository userRepository;
+    private final ProductRepository productRepository;
     private final ProductService productService;
     private final InventoryService inventoryService;
     private final CartItemMapperStruct cartItemMapper;
@@ -48,7 +52,7 @@ public class CartServiceImpl implements CartService {
             throw new InsufficientStockException(request.getProductId(), request.getQuantity(), 0);
         }
 
-        Optional<CartItem> existingItem = cartItemRepository.findByUserIdAndProductId(request.getUserId(),
+        Optional<CartItem> existingItem = cartItemRepository.findByUser_IdAndProduct_Id(request.getUserId(),
                 request.getProductId());
 
         if (existingItem.isPresent()) {
@@ -64,8 +68,8 @@ public class CartServiceImpl implements CartService {
             return cartItemMapper.toCartItemResponse(updatedItem);
         } else {
             CartItem cartItem = CartItem.builder()
-                    .userId(request.getUserId())
-                    .productId(request.getProductId())
+                    .user(userRepository.getReferenceById(request.getUserId()))
+                    .product(productRepository.getReferenceById(request.getProductId()))
                     .quantity(request.getQuantity())
                     .build();
 
@@ -84,8 +88,8 @@ public class CartServiceImpl implements CartService {
         CartItem cartItem = cartItemRepository.findById(cartItemId)
                 .orElseThrow(() -> new ResourceNotFoundException("CartItem", "id", cartItemId));
 
-        if (!inventoryService.hasAvailableStock(cartItem.getProductId(), newQuantity)) {
-            throw new InsufficientStockException(cartItem.getProductId(), newQuantity, 0);
+        if (!inventoryService.hasAvailableStock(cartItem.getProduct().getId(), newQuantity)) {
+            throw new InsufficientStockException(cartItem.getProduct().getId(), newQuantity, 0);
         }
 
         cartItem.setQuantity(newQuantity);
@@ -105,7 +109,7 @@ public class CartServiceImpl implements CartService {
 
     @Override
     public List<CartItemResponse> getCartItems(Integer userId) {
-        List<CartItem> items = cartItemRepository.findByUserId(userId);
+        List<CartItem> items = cartItemRepository.findByUser_Id(userId);
         return items.stream()
                 .map(cartItemMapper::toCartItemResponse)
                 .collect(Collectors.toList());
@@ -114,16 +118,16 @@ public class CartServiceImpl implements CartService {
     @Override
     @Transactional()
     public void clearCart(Integer userId) {
-        cartItemRepository.deleteByUserId(userId);
+        cartItemRepository.deleteByUser_Id(userId);
     }
 
     @Override
     public double getCartTotal(Integer userId) {
-        List<CartItem> items = cartItemRepository.findByUserId(userId);
+        List<CartItem> items = cartItemRepository.findByUser_Id(userId);
 
         return items.stream()
                 .mapToDouble(item -> {
-                    ProductResponse product = productService.getProductById(item.getProductId());
+                    ProductResponse product = productService.getProductById(item.getProduct().getId());
                     return product.getPrice() * item.getQuantity();
                 })
                 .sum();
@@ -131,7 +135,7 @@ public class CartServiceImpl implements CartService {
 
     @Override
     public int getCartItemCount(Integer userId) {
-        List<CartItem> items = cartItemRepository.findByUserId(userId);
+        List<CartItem> items = cartItemRepository.findByUser_Id(userId);
         return items.stream()
                 .mapToInt(CartItem::getQuantity)
                 .sum();

@@ -10,11 +10,11 @@ import java.util.List;
 
 @Repository
 public interface ReviewRepository extends JpaRepository<Review, Integer> {
-    List<Review> findByProductId(int productId);
-    List<Review> findByUserId(int userId);
+    List<Review> findByProduct_Id(int productId);
+    List<Review> findByUser_Id(int userId);
     
-    @Query("SELECT AVG(r.rating) FROM Review r WHERE r.productId = :productId")
+    @Query("SELECT AVG(r.rating) FROM Review r WHERE r.product.id = :productId")
     Double getAverageRating(@Param("productId") int productId);
     
-    boolean existsByUserIdAndProductId(int userId, int productId);
+    boolean existsByUser_IdAndProduct_Id(int userId, int productId);
 }

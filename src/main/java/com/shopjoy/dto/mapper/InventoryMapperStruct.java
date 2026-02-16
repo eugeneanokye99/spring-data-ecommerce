@@ -18,13 +18,17 @@ public interface InventoryMapperStruct {
      * @param productName the product name
      * @return the inventory response
      */
-    @Mapping(target = "productName", source = "product.productName")
+    @Mapping(target = "inventoryId", source = "inventory.id")
+    @Mapping(target = "productId", source = "inventory.product.id")
+    @Mapping(target = "productName", source = "inventory.product.productName")
     @Mapping(target = "stockQuantity", source = "inventory.quantityInStock")
     InventoryResponse toInventoryResponse(Inventory inventory);
 
     /**
      * Convert Inventory entity to InventoryResponse with manual product name.
      */
+    @Mapping(target = "inventoryId", source = "inventory.id")
+    @Mapping(target = "productId", source = "inventory.product.id")
     @Mapping(target = "productName", source = "productName")
     @Mapping(target = "stockQuantity", source = "inventory.quantityInStock")
     InventoryResponse toInventoryResponse(Inventory inventory, String productName);

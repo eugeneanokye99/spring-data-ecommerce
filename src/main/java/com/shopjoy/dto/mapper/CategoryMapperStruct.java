@@ -27,7 +27,8 @@ public interface CategoryMapperStruct {
      * @param request the create category request
      * @return the mapped category entity
      */
-    @Mapping(target = "categoryId", ignore = true)
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "parentCategory", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     Category toCategory(CreateCategoryRequest request);
 
@@ -37,6 +38,8 @@ public interface CategoryMapperStruct {
      * @param category the category entity
      * @return the mapped category response
      */
+    @Mapping(target = "categoryId", source = "category.id")
+    @Mapping(target = "parentCategoryId", source = "category.parentCategory.id")
     CategoryResponse toCategoryResponse(Category category);
 
     /**
@@ -54,8 +57,8 @@ public interface CategoryMapperStruct {
      * @param request the update request
      * @param category the existing category to update
      */
-    @Mapping(target = "categoryId", ignore = true)
-    @Mapping(target = "parentCategoryId", ignore = true) // Usually not updated via category update
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "parentCategory", ignore = true) // Usually not updated via category update
     @Mapping(target = "createdAt", ignore = true)
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     void updateCategoryFromRequest(UpdateCategoryRequest request, @MappingTarget Category category);

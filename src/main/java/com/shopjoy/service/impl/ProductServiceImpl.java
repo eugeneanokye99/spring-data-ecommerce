@@ -39,6 +39,7 @@ public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
     private final InventoryRepository inventoryRepository;
+    private final CategoryRepository categoryRepository;
     private final ProductMapperStruct productMapper;
 
     @Override
@@ -46,6 +47,9 @@ public class ProductServiceImpl implements ProductService {
     @CacheEvict(value = {"products", "activeProducts", "productsByCategory"}, allEntries = true)
     public ProductResponse createProduct(CreateProductRequest request) {
         Product product = productMapper.toProduct(request);
+        if (request.getCategoryId() != null) {
+            product.setCategory(categoryRepository.getReferenceById(request.getCategoryId()));
+        }
         product.setCreatedAt(LocalDateTime.now());
         product.setUpdatedAt(LocalDateTime.now());
         product.setActive(true);
@@ -56,7 +60,7 @@ public class ProductServiceImpl implements ProductService {
 
         // Create initial inventory entry
         com.shopjoy.entity.Inventory inventory = new com.shopjoy.entity.Inventory();
-        inventory.setProductId(createdProduct.getProductId());
+        inventory.setProduct(createdProduct);
         inventory.setQuantityInStock(request.getInitialStock() != null ? request.getInitialStock() : 0);
         inventory.setReorderLevel(5);
         inventory.setLastRestocked(LocalDateTime.now());
@@ -113,7 +117,7 @@ public class ProductServiceImpl implements ProductService {
         if (categoryId == null) {
             throw new ValidationException("Category ID cannot be null");
         }
-        return productRepository.findByCategoryId(categoryId).stream()
+        return productRepository.findByCategory_Id(categoryId).stream()
                 .map(productMapper::toProductResponse)
                 .collect(Collectors.toList());
     }
@@ -124,7 +128,7 @@ public class ProductServiceImpl implements ProductService {
         if (categoryIds == null || categoryIds.isEmpty()) {
             return Collections.emptyList();
         }
-        return productRepository.findByCategoryIdIn(categoryIds).stream()
+        return productRepository.findByCategory_IdIn(categoryIds).stream()
                 .map(productMapper::toProductResponse)
                 .collect(Collectors.toList());
     }
@@ -163,6 +167,9 @@ public class ProductServiceImpl implements ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
 
         productMapper.updateProductFromRequest(request, existingProduct);
+        if (request.getCategoryId() != null) {
+            existingProduct.setCategory(categoryRepository.getReferenceById(request.getCategoryId()));
+        }
         existingProduct.setUpdatedAt(LocalDateTime.now());
 
         validateProductData(existingProduct);
@@ -248,7 +255,7 @@ public class ProductServiceImpl implements ProductService {
         if (categoryId == null) {
             throw new ValidationException("Category ID cannot be null");
         }
-        return productRepository.countByCategoryId(categoryId);
+        return productRepository.countByCategory_Id(categoryId);
     }
 
     @Override
@@ -332,7 +339,7 @@ public class ProductServiceImpl implements ProductService {
             throw new ValidationException("productName", "must not exceed 200 characters");
         }
 
-        if (product.getCategoryId() <= 0) {
+        if (product.getCategory() == null || product.getCategory().getId() <= 0) {
             throw new ValidationException("categoryId", "must be a valid category ID");
         }
 

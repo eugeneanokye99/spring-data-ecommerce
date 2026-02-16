@@ -49,7 +49,7 @@ public class ValidationAspect {
     public void validateOrderBeforeCreation(JoinPoint joinPoint, Order order) {
         logger.debug("Validating order before creation: {}", order);
         
-        if (order.getUserId() <= 0) {
+        if (order.getUser() == null || order.getUser().getId() <= 0) {
             throw new IllegalArgumentException("Valid user ID is required for order");
         }
 

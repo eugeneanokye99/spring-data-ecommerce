@@ -9,7 +9,9 @@ import com.shopjoy.exception.BusinessException;
 import com.shopjoy.exception.ResourceNotFoundException;
 import com.shopjoy.exception.ValidationException;
 import com.shopjoy.repository.OrderRepository;
+import com.shopjoy.repository.ProductRepository;
 import com.shopjoy.repository.ReviewRepository;
+import com.shopjoy.repository.UserRepository;
 import com.shopjoy.service.ReviewService;
 
 import lombok.AllArgsConstructor;
@@ -30,6 +32,8 @@ public class ReviewServiceImpl implements ReviewService {
 
     private final ReviewRepository reviewRepository;
     private final OrderRepository orderRepository;
+    private final UserRepository userRepository;
+    private final ProductRepository productRepository;
     private final ReviewMapperStruct reviewMapper;
 
 
@@ -37,15 +41,18 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     @Transactional()
     public ReviewResponse createReview(CreateReviewRequest request) {
-        Review review = reviewMapper.toReview(request);
-        validateReviewData(review);
-
-        if (reviewRepository.existsByUserIdAndProductId(review.getUserId(), review.getProductId())) {
+        if (reviewRepository.existsByUser_IdAndProduct_Id(request.getUserId(), request.getProductId())) {
             throw new BusinessException("User has already reviewed this product");
         }
 
+        Review review = reviewMapper.toReview(request);
+        review.setUser(userRepository.getReferenceById(request.getUserId()));
+        review.setProduct(productRepository.getReferenceById(request.getProductId()));
+        
+        validateReviewData(review);
+
         boolean hasPurchased = orderRepository.hasUserPurchasedProduct(
-                review.getUserId(), review.getProductId());
+                request.getUserId(), request.getProductId());
 
         if (!hasPurchased) {
             // User reviewing without purchase - allowed but noted
@@ -68,14 +75,14 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Override
     public List<ReviewResponse> getReviewsByProduct(Integer productId) {
-        return reviewRepository.findByProductId(productId).stream()
+        return reviewRepository.findByProduct_Id(productId).stream()
                 .map(reviewMapper::toReviewResponse)
                 .collect(Collectors.toList());
     }
 
     @Override
     public List<ReviewResponse> getReviewsByUser(Integer userId) {
-        return reviewRepository.findByUserId(userId).stream()
+        return reviewRepository.findByUser_Id(userId).stream()
                 .map(reviewMapper::toReviewResponse)
                 .collect(Collectors.toList());
     }
@@ -142,11 +149,11 @@ public class ReviewServiceImpl implements ReviewService {
             throw new ValidationException("Review data cannot be null");
         }
 
-        if (review.getUserId() <= 0) {
+        if (review.getUser() == null || review.getUser().getId() <= 0) {
             throw new ValidationException("userId", "is required");
         }
 
-        if (review.getProductId() <= 0) {
+        if (review.getProduct() == null || review.getProduct().getId() <= 0) {
             throw new ValidationException("productId", "is required");
         }
 

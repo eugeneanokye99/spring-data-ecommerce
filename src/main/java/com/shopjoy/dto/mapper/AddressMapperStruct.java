@@ -27,7 +27,8 @@ public interface AddressMapperStruct {
      * @param request the create address request
      * @return the mapped address entity
      */
-    @Mapping(target = "addressId", ignore = true)
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "user", ignore = true)
     @Mapping(target = "isDefault", source = "isDefault", defaultValue = "false")
     @Mapping(target = "createdAt", ignore = true)
     Address toAddress(CreateAddressRequest request);
@@ -38,7 +39,9 @@ public interface AddressMapperStruct {
      * @param address the address entity
      * @return the mapped address response
      */
-    @Mapping(target = "default", source = "default")
+    @Mapping(target = "addressId", source = "id")
+    @Mapping(target = "userId", source = "user.id")
+    @Mapping(target = "default", source = "address.default")
     AddressResponse toAddressResponse(Address address);
 
     /**
@@ -56,7 +59,7 @@ public interface AddressMapperStruct {
      * @param request the update request
      * @param address the existing address to update
      */
-    @Mapping(target = "addressId", ignore = true)
+    @Mapping(target = "id", ignore = true)
     @Mapping(target = "userId", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "default", source = "isDefault")

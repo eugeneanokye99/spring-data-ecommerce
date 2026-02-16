@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * The type User controller.
@@ -266,7 +267,7 @@ public class UserController {
     })
     @PostMapping("/authenticate")
     public ResponseEntity<ApiResponse<UserResponse>> authenticateUser(
-            @Valid @RequestBody java.util.Map<String, String> request) {
+            @Valid @RequestBody Map<String, String> request) {
         String username = request.get("username");
         String password = request.get("password");
         UserResponse response = userService.authenticateUser(username, password);
@@ -305,7 +306,7 @@ public class UserController {
     public ResponseEntity<ApiResponse<Void>> changePassword(
             @Parameter(description = "User unique identifier", required = true, example = "1")
             @PathVariable Integer id,
-            @Valid @RequestBody java.util.Map<String, String> request) {
+            @Valid @RequestBody Map<String, String> request) {
         String oldPassword = request.get("oldPassword");
         String newPassword = request.get("newPassword");
         userService.changePassword(id, oldPassword, newPassword);

@@ -43,9 +43,10 @@ public class CategoryServiceImpl implements CategoryService {
         
         validateCategoryData(category);
         
-        if (category.getParentCategoryId() != null) {
-            categoryRepository.findById(category.getParentCategoryId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Category", "id", category.getParentCategoryId()));
+        if (request.getParentCategoryId() != null) {
+            Category parent = categoryRepository.findById(request.getParentCategoryId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Category", "id", request.getParentCategoryId()));
+            category.setParentCategory(parent);
         }
         
         category.setCreatedAt(LocalDateTime.now());
@@ -91,7 +92,7 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     @Cacheable(value = "topLevelCategories")
     public List<CategoryResponse> getTopLevelCategories() {
-        return categoryRepository.findByParentCategoryIdIsNull().stream()
+        return categoryRepository.findByParentCategoryIsNull().stream()
                 .map(categoryMapper::toCategoryResponse)
                 .collect(Collectors.toList());
     }
@@ -102,7 +103,7 @@ public class CategoryServiceImpl implements CategoryService {
         if (parentCategoryId == null) {
             throw new ValidationException("Parent category ID cannot be null");
         }
-        return categoryRepository.findByParentCategoryId(parentCategoryId).stream()
+        return categoryRepository.findByParentCategory_Id(parentCategoryId).stream()
                 .map(categoryMapper::toCategoryResponse)
                 .collect(Collectors.toList());
     }
@@ -112,7 +113,7 @@ public class CategoryServiceImpl implements CategoryService {
         if (categoryId == null) {
             throw new ValidationException("Category ID cannot be null");
         }
-        return categoryRepository.existsByParentCategoryId(categoryId);
+        return categoryRepository.existsByParentCategory_Id(categoryId);
     }
     
     @Override
@@ -128,14 +129,18 @@ public class CategoryServiceImpl implements CategoryService {
         categoryMapper.updateCategoryFromRequest(request, category);
         validateCategoryData(category);
         
-        if (category.getParentCategoryId() != null) {
-            if (category.getParentCategoryId().equals(category.getCategoryId())) {
+        if (request.getParentCategoryId() != null) {
+            if (request.getParentCategoryId().equals(category.getId())) {
                 throw new BusinessException("Category cannot be its own parent");
             }
             
-            if (wouldCreateCircularReference(category.getCategoryId(), category.getParentCategoryId())) {
+            if (wouldCreateCircularReference(category.getId(), request.getParentCategoryId())) {
                 throw new BusinessException("Moving category would create circular reference");
             }
+
+            Category parent = categoryRepository.findById(request.getParentCategoryId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Category", "id", request.getParentCategoryId()));
+            category.setParentCategory(parent);
         }
         
         Category updatedCategory = categoryRepository.save(category);
@@ -182,15 +187,17 @@ public class CategoryServiceImpl implements CategoryService {
                 throw new BusinessException("Category cannot be its own parent");
             }
             
-            categoryRepository.findById(newParentId)
+            Category newParent = categoryRepository.findById(newParentId)
                     .orElseThrow(() -> new ResourceNotFoundException("Category", "id", newParentId));
             
             if (wouldCreateCircularReference(categoryId, newParentId)) {
                 throw new BusinessException("Moving category would create circular reference");
             }
+            category.setParentCategory(newParent);
+        } else {
+            category.setParentCategory(null);
         }
         
-        category.setParentCategoryId(newParentId);
         Category updatedCategory = categoryRepository.save(category);
         return categoryMapper.toCategoryResponse(updatedCategory);
     }
@@ -202,7 +209,7 @@ public class CategoryServiceImpl implements CategoryService {
                 return true;
             }
             Category parent = categoryRepository.findById(currentId).orElse(null);
-            currentId = (parent != null) ? parent.getParentCategoryId() : null;
+            currentId = (parent != null && parent.getParentCategory() != null) ? parent.getParentCategory().getId() : null;
         }
         return false;
     }

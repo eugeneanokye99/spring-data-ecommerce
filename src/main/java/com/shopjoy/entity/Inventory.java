@@ -27,13 +27,10 @@ public class Inventory implements Serializable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "inventory_id")
-    private Integer inventoryId;
-
-    @Column(name = "product_id", unique = true, nullable = false)
-    private int productId;
+    private Integer id;
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", insertable = false, updatable = false)
+    @JoinColumn(name = "product_id", nullable = false, unique = true)
     private Product product;
 
     @Column(name = "quantity_in_stock")

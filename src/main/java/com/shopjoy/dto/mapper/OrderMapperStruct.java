@@ -28,7 +28,7 @@ public interface OrderMapperStruct {
      * @param request the create order request
      * @return the mapped order entity
      */
-    @Mapping(target = "orderId", ignore = true)
+    @Mapping(target = "id", ignore = true)
     @Mapping(target = "orderDate", ignore = true)
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "paymentStatus", ignore = true)
@@ -40,13 +40,15 @@ public interface OrderMapperStruct {
     /**
      * Maps Order entity to OrderResponse with additional data.
      */
+    @Mapping(source = "order.id", target = "orderId")
     @Mapping(target = "userName", expression = "java(order.getUser() != null ? order.getUser().getFirstName() + \" \" + order.getUser().getLastName() : \"Unknown User\")")
-    @Mapping(target = "orderItems", source = "orderItems")
+    @Mapping(target = "orderItems", source = "order.orderItems")
     OrderResponse toOrderResponse(Order order);
 
     /**
      * Maps Order entity to OrderResponse with explicit additional data.
      */
+    @Mapping(source = "order.id", target = "orderId")
     @Mapping(target = "userName", source = "userName")
     @Mapping(target = "orderItems", source = "orderItems")
     OrderResponse toOrderResponse(Order order, String userName, List<OrderItemResponse> orderItems);
@@ -57,7 +59,7 @@ public interface OrderMapperStruct {
      * @param request the update request
      * @param order the existing order to update
      */
-    @Mapping(target = "orderId", ignore = true)
+    @Mapping(target = "id", ignore = true)
     @Mapping(target = "userId", ignore = true)
     @Mapping(target = "orderDate", ignore = true)
     @Mapping(target = "status", ignore = true)
