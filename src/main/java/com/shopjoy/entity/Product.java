@@ -14,7 +14,8 @@ import java.util.List;
 /**
  * The type Product.
  */
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -42,8 +43,6 @@ public class Product implements Serializable {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", insertable = false, updatable = false)
-    @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private Category category;
 
     @Column(name = "price", nullable = false)
@@ -71,20 +70,14 @@ public class Product implements Serializable {
     private LocalDateTime updatedAt;
 
     @OneToOne(mappedBy = "product", cascade = CascadeType.ALL)
-    @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private Inventory inventory;
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
     @Builder.Default
-    @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private List<Review> reviews = new ArrayList<>();
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
     @Builder.Default
-    @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private List<OrderItem> orderItems = new ArrayList<>();
 
     @PrePersist

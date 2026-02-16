@@ -11,7 +11,8 @@ import java.time.LocalDateTime;
 /**
  * The type Review.
  */
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -35,8 +36,6 @@ public class Review implements Serializable {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", insertable = false, updatable = false)
-    @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private Product product;
 
     @Column(name = "user_id", nullable = false)
@@ -44,8 +43,6 @@ public class Review implements Serializable {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", insertable = false, updatable = false)
-    @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private User user;
 
     @Column(name = "rating", nullable = false)

@@ -12,7 +12,8 @@ import java.time.LocalDateTime;
 /**
  * The type Cart item.
  */
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -32,8 +33,6 @@ public class CartItem implements Serializable {
     @Column(name = "user_id", nullable = false)
     private int userId;
 
-    @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", insertable = false, updatable = false)
     private User user;
@@ -41,8 +40,6 @@ public class CartItem implements Serializable {
     @Column(name = "product_id", nullable = false)
     private int productId;
 
-    @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "product_id", insertable = false, updatable = false)
     private Product product;

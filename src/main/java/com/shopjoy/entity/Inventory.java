@@ -11,7 +11,8 @@ import java.time.LocalDateTime;
 /**
  * The type Inventory.
  */
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -33,8 +34,6 @@ public class Inventory implements Serializable {
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", insertable = false, updatable = false)
-    @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private Product product;
 
     @Column(name = "quantity_in_stock")
