@@ -36,7 +36,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -62,71 +61,17 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional(isolation = Isolation.SERIALIZABLE, propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
     public OrderResponse createOrder(CreateOrderRequest request) {
-        userService.getUserById(request.getUserId());
-
-        if (request.getShippingAddress() == null || request.getShippingAddress().trim().isEmpty()) {
-            throw new ValidationException("Shipping address is required");
-        }
-
-        if (request.getOrderItems() == null || request.getOrderItems().isEmpty()) {
-            throw new ValidationException("Order must have at least one item");
-        }
-
-        Map<Integer, ProductResponse> productCache = new HashMap<>();
-        for (CreateOrderItemRequest itemReq : request.getOrderItems()) {
-            ProductResponse product = productService.getProductById(itemReq.getProductId());
-            productCache.put(itemReq.getProductId(), product);
-        }
-
-        BigDecimal totalAmount = BigDecimal.ZERO;
-        for (CreateOrderItemRequest itemReq : request.getOrderItems()) {
-            ProductResponse product = productCache.get(itemReq.getProductId());
-            if (!product.isActive()) {
-                throw new ValidationException("Product " + product.getProductName() + " is not active");
-            }
-            if (!inventoryService.hasAvailableStock(itemReq.getProductId(), itemReq.getQuantity())) {
-                throw new ValidationException("Insufficient stock for product: " + product.getProductName());
-            }
-            BigDecimal itemTotal = BigDecimal.valueOf(product.getPrice())
-                    .multiply(BigDecimal.valueOf(itemReq.getQuantity()));
-            totalAmount = totalAmount.add(itemTotal);
-        }
-
-        for (CreateOrderItemRequest itemReq : request.getOrderItems()) {
-            inventoryService.reserveStock(itemReq.getProductId(), itemReq.getQuantity());
-        }
-
-        Order order = orderMapper.toOrder(request);
-        order.setUser(userRepository.getReferenceById(request.getUserId()));
-        order.setTotalAmount(totalAmount);
-        order.setOrderDate(LocalDateTime.now());
-        order.setStatus(OrderStatus.PENDING);
-        order.setPaymentStatus(PaymentStatus.UNPAID);
+        validateCreateOrderRequest(request);
         
-        if (order.getPaymentMethod() == null || order.getPaymentMethod().trim().isEmpty()) {
-            order.setPaymentMethod("CASH");
-        }
+        Map<Integer, ProductResponse> productCache = fetchProducts(request.getOrderItems());
         
-        order.setCreatedAt(LocalDateTime.now());
-        order.setUpdatedAt(LocalDateTime.now());
-
-        Order createdOrder = orderRepository.save(order);
-
-        for (CreateOrderItemRequest itemReq : request.getOrderItems()) {
-            ProductResponse product = productCache.get(itemReq.getProductId());
-            BigDecimal unitPrice = BigDecimal.valueOf(product.getPrice());
-            BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(itemReq.getQuantity()));
-            
-            OrderItem orderItem = OrderItem.builder()
-                    .order(createdOrder)
-                    .product(productRepository.getReferenceById(itemReq.getProductId()))
-                    .quantity(itemReq.getQuantity())
-                    .unitPrice(unitPrice)
-                    .subtotal(subtotal)
-                    .createdAt(LocalDateTime.now())
-                    .build();
-            orderItemRepository.save(orderItem);
-        }
+        BigDecimal totalAmount = validateStockAndCalculateTotal(request.getOrderItems(), productCache);
+        
+        reserveInventory(request.getOrderItems());
+        
+        Order createdOrder = buildAndSaveOrder(request, totalAmount);
+        
+        createAndSaveOrderItems(createdOrder, request.getOrderItems(), productCache);
 
         return getOrderById(createdOrder.getId());
     }
@@ -316,9 +261,9 @@ public class OrderServiceImpl implements OrderService {
 
         List<OrderItem> orderItems = orderItemRepository.findByOrder_Id(orderId);
 
-        for (OrderItem item : orderItems) {
-            inventoryService.releaseStock(item.getProduct().getId(), item.getQuantity());
-        }
+        orderItems.forEach(item -> 
+            inventoryService.releaseStock(item.getProduct().getId(), item.getQuantity())
+        );
 
         order.setStatus(OrderStatus.CANCELLED);
         order.setUpdatedAt(LocalDateTime.now());
@@ -340,70 +285,24 @@ public class OrderServiceImpl implements OrderService {
                 .collect(Collectors.toList());
     }
 
-@Transactional(isolation = Isolation.SERIALIZABLE)
-public OrderResponse updateOrder(Integer orderId, UpdateOrderRequest request) {
-    Order order = orderRepository.findById(orderId)
-            .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    public OrderResponse updateOrder(Integer orderId, UpdateOrderRequest request) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
-    if (order.getStatus() != OrderStatus.PENDING) {
-        throw new InvalidOrderStateException(orderId, order.getStatus().toString(), 
-            "update (can only update PENDING orders)");
-    }
+        validateOrderModifiable(order);
 
-    if (request.getShippingAddress() != null && !request.getShippingAddress().trim().isEmpty()) {
-        order.setShippingAddress(request.getShippingAddress());
-    }
+        updateOrderFields(order, request);
 
-    if (request.getPaymentMethod() != null) {
-        order.setPaymentMethod(request.getPaymentMethod());
-    }
+        if (request.getOrderItems() != null && !request.getOrderItems().isEmpty()) {
+            updateOrderItems(order, request.getOrderItems());
+        }
 
-    if (request.getNotes() != null) {
-        order.setNotes(request.getNotes());
-    }
-
-    if (request.getOrderItems() != null && !request.getOrderItems().isEmpty()) {
-        List<OrderItem> existingItems = orderItemRepository.findByOrder_Id(orderId);
+        order.setUpdatedAt(LocalDateTime.now());
+        Order updatedOrder = orderRepository.save(order);
         
-        for (OrderItem item : existingItems) {
-            inventoryService.releaseStock(item.getProduct().getId(), item.getQuantity());
-        }
-
-        for (OrderItem item : existingItems) {
-            orderItemRepository.deleteById(item.getId());
-        }
-
-        double newTotal = 0.0;
-        for (UpdateOrderItemRequest itemReq : request.getOrderItems()) {
-            ProductResponse product = productService.getProductById(itemReq.getProductId());
-            if (!product.isActive()) {
-                throw new ValidationException("Product " + product.getProductName() + " is not active");
-            }
-            if (!inventoryService.hasAvailableStock(itemReq.getProductId(), itemReq.getQuantity())) {
-                throw new ValidationException("Insufficient stock for product: " + product.getProductName());
-            }
-            inventoryService.reserveStock(itemReq.getProductId(), itemReq.getQuantity());
-            newTotal += itemReq.getPrice() * itemReq.getQuantity();
-        }
-
-        for (UpdateOrderItemRequest itemReq : request.getOrderItems()) {
-            OrderItem orderItem = OrderItem.builder()
-                    .order(order)
-                    .product(productRepository.getReferenceById(itemReq.getProductId()))
-                    .quantity(itemReq.getQuantity())
-                    .unitPrice(new BigDecimal(itemReq.getPrice().toString()))
-                    .subtotal(new BigDecimal(itemReq.getQuantity() * itemReq.getPrice()))
-                    .createdAt(LocalDateTime.now())
-                    .build();
-            orderItemRepository.save(orderItem);
-        }
-        order.setTotalAmount(new BigDecimal(newTotal));
+        return orderMapper.toOrderResponse(updatedOrder);
     }
-    order.setUpdatedAt(LocalDateTime.now());
-    Order updatedOrder = orderRepository.save(order);
-    
-    return orderMapper.toOrderResponse(updatedOrder);
-}
 
 
     @Override
@@ -417,9 +316,9 @@ public OrderResponse updateOrder(Integer orderId, UpdateOrderRequest request) {
         }
 
         List<OrderItem> orderItems = orderItemRepository.findByOrder_Id(orderId);
-        for (OrderItem item : orderItems) {
-            inventoryService.releaseStock(item.getProduct().getId(), item.getQuantity());
-        }
+        orderItems.forEach(item -> 
+            inventoryService.releaseStock(item.getProduct().getId(), item.getQuantity())
+        );
 
         orderRepository.deleteById(orderId);
     }
@@ -519,5 +418,159 @@ public OrderResponse updateOrder(Integer orderId, UpdateOrderRequest request) {
             throw new RuntimeException("Simulated payment gateway failure for order " + orderId);
         }
         return confirmOrder(orderId);
+    }
+
+    private void validateCreateOrderRequest(CreateOrderRequest request) {
+        userService.getUserById(request.getUserId());
+
+        if (request.getShippingAddress() == null || request.getShippingAddress().trim().isEmpty()) {
+            throw new ValidationException("Shipping address is required");
+        }
+
+        if (request.getOrderItems() == null || request.getOrderItems().isEmpty()) {
+            throw new ValidationException("Order must have at least one item");
+        }
+    }
+
+    private Map<Integer, ProductResponse> fetchProducts(List<CreateOrderItemRequest> items) {
+        List<Integer> productIds = items.stream()
+                .map(CreateOrderItemRequest::getProductId)
+                .distinct()
+                .collect(Collectors.toList());
+
+        List<ProductResponse> products = productService.getProductsByIds(productIds);
+
+        Map<Integer, ProductResponse> productMap = products.stream()
+                .collect(Collectors.toMap(ProductResponse::getId, java.util.function.Function.identity()));
+
+        if (productMap.size() != productIds.size()) {
+            List<Integer> foundIds = new java.util.ArrayList<>(productMap.keySet());
+            List<Integer> missingIds = productIds.stream()
+                    .filter(id -> !foundIds.contains(id))
+                    .collect(Collectors.toList());
+            throw new ResourceNotFoundException("Products", "ids", missingIds);
+        }
+
+        return productMap;
+    }
+
+    private BigDecimal validateStockAndCalculateTotal(List<CreateOrderItemRequest> items, Map<Integer, ProductResponse> productCache) {
+        return items.stream()
+                .map(itemReq -> {
+                    ProductResponse product = productCache.get(itemReq.getProductId());
+                    if (!product.isActive()) {
+                        throw new ValidationException("Product " + product.getProductName() + " is not active");
+                    }
+                    if (!inventoryService.hasAvailableStock(itemReq.getProductId(), itemReq.getQuantity())) {
+                        throw new ValidationException("Insufficient stock for product: " + product.getProductName());
+                    }
+                    return BigDecimal.valueOf(product.getPrice())
+                            .multiply(BigDecimal.valueOf(itemReq.getQuantity()));
+                })
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private void reserveInventory(List<CreateOrderItemRequest> items) {
+        items.forEach(itemReq -> 
+            inventoryService.reserveStock(itemReq.getProductId(), itemReq.getQuantity())
+        );
+    }
+
+    private Order buildAndSaveOrder(CreateOrderRequest request, BigDecimal totalAmount) {
+        Order order = orderMapper.toOrder(request);
+        order.setUser(userRepository.getReferenceById(request.getUserId()));
+        order.setTotalAmount(totalAmount);
+        order.setOrderDate(LocalDateTime.now());
+        order.setStatus(OrderStatus.PENDING);
+        order.setPaymentStatus(PaymentStatus.UNPAID);
+        
+        if (order.getPaymentMethod() == null || order.getPaymentMethod().trim().isEmpty()) {
+            order.setPaymentMethod("CASH");
+        }
+        
+        order.setCreatedAt(LocalDateTime.now());
+        order.setUpdatedAt(LocalDateTime.now());
+
+        return orderRepository.save(order);
+    }
+
+    private void createAndSaveOrderItems(Order order, List<CreateOrderItemRequest> items, Map<Integer, ProductResponse> productCache) {
+        List<OrderItem> orderItems = items.stream()
+                .map(itemReq -> {
+                    ProductResponse product = productCache.get(itemReq.getProductId());
+                    BigDecimal unitPrice = BigDecimal.valueOf(product.getPrice());
+                    BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(itemReq.getQuantity()));
+
+                    return OrderItem.builder()
+                            .order(order)
+                            .product(productRepository.getReferenceById(itemReq.getProductId()))
+                            .quantity(itemReq.getQuantity())
+                            .unitPrice(unitPrice)
+                            .subtotal(subtotal)
+                            .createdAt(LocalDateTime.now())
+                            .build();
+                })
+                .collect(Collectors.toList());
+        orderItemRepository.saveAll(orderItems);
+    }
+
+    private void validateOrderModifiable(Order order) {
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new InvalidOrderStateException(order.getId(), order.getStatus().toString(), 
+                "update (can only update PENDING orders)");
+        }
+    }
+
+    private void updateOrderFields(Order order, UpdateOrderRequest request) {
+        if (request.getShippingAddress() != null && !request.getShippingAddress().trim().isEmpty()) {
+            order.setShippingAddress(request.getShippingAddress());
+        }
+
+        if (request.getPaymentMethod() != null) {
+            order.setPaymentMethod(request.getPaymentMethod());
+        }
+
+        if (request.getNotes() != null) {
+            order.setNotes(request.getNotes());
+        }
+    }
+
+    private void updateOrderItems(Order order, List<UpdateOrderItemRequest> newItems) {
+        List<OrderItem> existingItems = orderItemRepository.findByOrder_Id(order.getId());
+        
+        existingItems.forEach(item -> 
+            inventoryService.releaseStock(item.getProduct().getId(), item.getQuantity())
+        );
+
+        existingItems.forEach(item -> orderItemRepository.deleteById(item.getId()));
+
+        BigDecimal newTotal = newItems.stream()
+            .map(itemReq -> {
+                ProductResponse product = productService.getProductById(itemReq.getProductId());
+                if (!product.isActive()) {
+                    throw new ValidationException("Product " + product.getProductName() + " is not active");
+                }
+                if (!inventoryService.hasAvailableStock(itemReq.getProductId(), itemReq.getQuantity())) {
+                    throw new ValidationException("Insufficient stock for product: " + product.getProductName());
+                }
+                inventoryService.reserveStock(itemReq.getProductId(), itemReq.getQuantity());
+                return BigDecimal.valueOf(itemReq.getPrice())
+                        .multiply(BigDecimal.valueOf(itemReq.getQuantity()));
+            })
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        List<OrderItem> newOrderItems = newItems.stream()
+                .map(itemReq -> OrderItem.builder()
+                        .order(order)
+                        .product(productRepository.getReferenceById(itemReq.getProductId()))
+                        .quantity(itemReq.getQuantity())
+                        .unitPrice(BigDecimal.valueOf(itemReq.getPrice()))
+                        .subtotal(BigDecimal.valueOf(itemReq.getPrice()).multiply(BigDecimal.valueOf(itemReq.getQuantity())))
+                        .createdAt(LocalDateTime.now())
+                        .build())
+                .collect(Collectors.toList());
+        orderItemRepository.saveAll(newOrderItems);
+
+        order.setTotalAmount(newTotal);
     }
 }

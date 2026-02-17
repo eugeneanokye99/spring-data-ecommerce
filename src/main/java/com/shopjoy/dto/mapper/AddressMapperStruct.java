@@ -7,8 +7,6 @@ import com.shopjoy.entity.Address;
 import org.mapstruct.*;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-
 /**
  * MapStruct mapper for Address entity and DTOs providing type-safe bean mapping.
  * Replaces manual mapping boilerplate with compile-time generated code.
@@ -39,18 +37,9 @@ public interface AddressMapperStruct {
      * @param address the address entity
      * @return the mapped address response
      */
-    @Mapping(target = "id", source = "id")
     @Mapping(target = "userId", source = "user.id")
     @Mapping(target = "default", source = "default")
     AddressResponse toAddressResponse(Address address);
-
-    /**
-     * Maps list of Address entities to list of AddressResponse DTOs.
-     * 
-     * @param addresses list of address entities
-     * @return list of address response DTOs
-     */
-    List<AddressResponse> toAddressResponseList(List<Address> addresses);
 
     /**
      * Updates existing Address entity from UpdateAddressRequest.
