@@ -1,7 +1,6 @@
 package com.shopjoy.graphql.resolver.query;
 
 import com.shopjoy.dto.response.UserResponse;
-import com.shopjoy.graphql.input.UserFilterInput;
 import com.shopjoy.graphql.type.PageInfo;
 import com.shopjoy.graphql.type.UserConnection;
 import com.shopjoy.service.UserService;
@@ -25,13 +24,7 @@ public class UserQueryResolver {
     }
 
     @QueryMapping
-    public UserResponse user(@Argument Long id) {
-        return userService.getUserById(id.intValue());
-    }
-
-    @QueryMapping
     public UserConnection users(
-            @Argument UserFilterInput filter,
             @Argument Integer page,
             @Argument Integer size
     ) {

@@ -128,7 +128,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    @Cacheable(value = "ordersByStatus", key = "#status.name()")
+    @Cacheable(value = "ordersByStatus", key = "#status.name()", cacheManager = "mediumCacheManager")
     public List<OrderResponse> getOrdersByStatus(OrderStatus status) {
         if (status == null) {
             throw new ValidationException("Order status cannot be null");
@@ -140,6 +140,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Cacheable(value = "ordersByStatusPaginated", key = "#status.name() + '_' + #pageable.toString()", cacheManager = "mediumCacheManager")
     public Page<OrderResponse> getOrdersByStatusPaginated(OrderStatus status, Pageable pageable) {
         if (status == null) {
             throw new ValidationException("Order status cannot be null");
@@ -185,7 +186,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    @Cacheable(value = "orders")
+    @Cacheable(value = "orders", cacheManager = "mediumCacheManager")
     public Page<OrderResponse> getAllOrdersPaginated(Pageable pageable) {
         Page<Order> orderPage = orderRepository.findAll(pageable);
         
@@ -307,13 +308,13 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    @Cacheable(value = "pendingOrders")
+    @Cacheable(value = "pendingOrders", cacheManager = "mediumCacheManager")
     public List<OrderResponse> getPendingOrders() {
         return getOrdersByStatus(OrderStatus.PENDING);
     }
 
     @Override
-    @Cacheable(value = "orders")
+    @Cacheable(value = "orders", cacheManager = "mediumCacheManager")
     public List<OrderResponse> getAllOrders() {
         return orderRepository.findAll().stream()
                 .map(orderMapper::toOrderResponse)

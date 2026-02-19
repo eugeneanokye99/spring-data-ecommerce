@@ -77,7 +77,7 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     @Override
-    @Cacheable(value = "review", key = "#reviewId", unless = "#result == null")
+    @Cacheable(value = "review", key = "#reviewId", unless = "#result == null", cacheManager = "mediumCacheManager")
     public ReviewResponse getReviewById(Integer reviewId) {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> new ResourceNotFoundException("Review", "id", reviewId));
@@ -85,7 +85,7 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     @Override
-    @Cacheable(value = "reviewsByProduct", key = "#productId")
+    @Cacheable(value = "reviewsByProduct", key = "#productId", cacheManager = "mediumCacheManager")
     public List<ReviewResponse> getReviewsByProduct(Integer productId) {
         return reviewRepository.findByProductId(productId).stream()
                 .map(reviewMapper::toReviewResponse)
@@ -93,7 +93,7 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     @Override
-    @Cacheable(value = "reviewsByUser", key = "#userId")
+    @Cacheable(value = "reviewsByUser", key = "#userId", cacheManager = "mediumCacheManager")
     public List<ReviewResponse> getReviewsByUser(Integer userId) {
         return reviewRepository.findByUserId(userId).stream()
                 .map(reviewMapper::toReviewResponse)
@@ -151,7 +151,7 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     @Override
-    @Cacheable(value = "productRating", key = "#productId")
+    @Cacheable(value = "productRating", key = "#productId", cacheManager = "mediumCacheManager")
     public double getAverageRating(Integer productId) {
         return reviewRepository.getAverageRating(productId);
     }
@@ -169,7 +169,7 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     @Override
-    @Cacheable(value = "reviews")
+    @Cacheable(value = "reviews", cacheManager = "mediumCacheManager")
     public List<ReviewResponse> getAllReviews() {
         return reviewRepository.findAll().stream()
                 .map(reviewMapper::toReviewResponse)

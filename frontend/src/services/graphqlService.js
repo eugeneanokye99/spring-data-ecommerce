@@ -3,23 +3,12 @@ import {
   GET_DASHBOARD_ANALYTICS,
   GET_USER_ANALYTICS,
   GET_ALL_ORDERS,
-  GET_ORDER_BY_ID,
-  GET_USER_ORDERS,
-  GET_PRODUCTS,
-  GET_CATEGORIES,
-  GET_LOW_STOCK_PRODUCTS
+  GET_USER_ORDERS
 } from './queries';
 import {
   UPDATE_ORDER_STATUS,
   UPDATE_ORDER,
-  DELETE_ORDER,
-  CREATE_ORDER,
-  CREATE_PRODUCT,
-  UPDATE_PRODUCT,
-  DELETE_PRODUCT,
-  ADD_TO_CART,
-  REMOVE_FROM_CART,
-  UPDATE_STOCK
+  DELETE_ORDER
 } from './mutations';
 
 // Custom hooks for queries
@@ -47,41 +36,10 @@ export const useAllOrders = (filter = null, page = 0, size = 20, sortBy = 'order
   });
 };
 
-export const useOrderById = (orderId) => {
-  return useQuery(GET_ORDER_BY_ID, {
-    variables: { id: orderId },
-    skip: !orderId,
-    fetchPolicy: 'cache-and-network',
-    errorPolicy: 'all'
-  });
-};
-
 export const useUserOrders = (userId, filter = null, page = 0, size = 20, sortBy = 'orderDate', sortDirection = 'DESC') => {
   return useQuery(GET_USER_ORDERS, {
     variables: { userId, filter, page, size, sortBy, sortDirection },
     skip: !userId,
-    fetchPolicy: 'cache-and-network',
-    errorPolicy: 'all'
-  });
-};
-
-export const useProducts = (filter = null, page = 0, size = 20, sortBy = 'productId', sortDirection = 'ASC') => {
-  return useQuery(GET_PRODUCTS, {
-    variables: { filter, page, size, sortBy, sortDirection },
-    fetchPolicy: 'cache-and-network',
-    errorPolicy: 'all'
-  });
-};
-
-export const useCategories = () => {
-  return useQuery(GET_CATEGORIES, {
-    fetchPolicy: 'cache-and-network',
-    errorPolicy: 'all'
-  });
-};
-
-export const useLowStockProducts = () => {
-  return useQuery(GET_LOW_STOCK_PRODUCTS, {
     fetchPolicy: 'cache-and-network',
     errorPolicy: 'all'
   });
@@ -105,49 +63,6 @@ export const useUpdateOrder = () => {
 export const useDeleteOrder = () => {
   return useMutation(DELETE_ORDER, {
     refetchQueries: [{ query: GET_ALL_ORDERS }, { query: GET_USER_ORDERS }],
-    awaitRefetchQueries: true
-  });
-};
-
-export const useCreateOrder = () => {
-  return useMutation(CREATE_ORDER, {
-    refetchQueries: [{ query: GET_ALL_ORDERS }],
-    awaitRefetchQueries: true
-  });
-};
-
-export const useCreateProduct = () => {
-  return useMutation(CREATE_PRODUCT, {
-    refetchQueries: [{ query: GET_PRODUCTS }, { query: GET_DASHBOARD_ANALYTICS }],
-    awaitRefetchQueries: true
-  });
-};
-
-export const useUpdateProduct = () => {
-  return useMutation(UPDATE_PRODUCT, {
-    refetchQueries: [{ query: GET_PRODUCTS }],
-    awaitRefetchQueries: true
-  });
-};
-
-export const useDeleteProduct = () => {
-  return useMutation(DELETE_PRODUCT, {
-    refetchQueries: [{ query: GET_PRODUCTS }, { query: GET_DASHBOARD_ANALYTICS }],
-    awaitRefetchQueries: true
-  });
-};
-
-export const useAddToCart = () => {
-  return useMutation(ADD_TO_CART);
-};
-
-export const useRemoveFromCart = () => {
-  return useMutation(REMOVE_FROM_CART);
-};
-
-export const useUpdateStock = () => {
-  return useMutation(UPDATE_STOCK, {
-    refetchQueries: [{ query: GET_LOW_STOCK_PRODUCTS }, { query: GET_PRODUCTS }],
     awaitRefetchQueries: true
   });
 };

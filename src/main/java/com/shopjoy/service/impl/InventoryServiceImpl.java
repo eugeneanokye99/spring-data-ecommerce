@@ -68,7 +68,7 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
-    @Cacheable(value = "inventoryByProduct", key = "#productId", unless = "#result == null")
+    @Cacheable(value = "inventoryByProduct", key = "#productId", unless = "#result == null", cacheManager = "shortCacheManager")
     public InventoryResponse getInventoryByProduct(Integer productId) {
         Inventory inventory = inventoryRepository.findByProductId(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", productId));
@@ -76,7 +76,7 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
-    @Cacheable(value = "inventory", key = "'inStock-' + #productId")
+    @Cacheable(value = "inventory", key = "'inStock-' + #productId", cacheManager = "shortCacheManager")
     public boolean isProductInStock(Integer productId) {
         return inventoryRepository.findByProductId(productId)
                 .map(inventory -> inventory.getQuantityInStock() > 0)
@@ -84,7 +84,7 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
-    @Cacheable(value = "inventory", key = "'available-' + #productId + '-' + #quantity")
+    @Cacheable(value = "inventory", key = "'available-' + #productId + '-' + #quantity", cacheManager = "shortCacheManager")
     public boolean hasAvailableStock(Integer productId, int quantity) {
         return inventoryRepository.findByProductId(productId)
                 .map(inventory -> inventory.getQuantityInStock() >= quantity)
@@ -236,7 +236,7 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
-    @Cacheable(value = "lowStock")
+    @Cacheable(value = "lowStock", cacheManager = "shortCacheManager")
     public List<InventoryResponse> getLowStockProducts() {
         return inventoryRepository.findLowStock().stream()
                 .map(inventoryMapper::toInventoryResponse)
@@ -244,7 +244,7 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
-    @Cacheable(value = "outOfStock")
+    @Cacheable(value = "outOfStock", cacheManager = "shortCacheManager")
     public List<InventoryResponse> getOutOfStockProducts() {
         return inventoryRepository.findAll().stream()
                 .filter(inventory -> inventory.getQuantityInStock() == 0)

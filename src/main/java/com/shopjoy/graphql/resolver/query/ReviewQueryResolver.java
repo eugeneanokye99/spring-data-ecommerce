@@ -20,11 +20,6 @@ public class ReviewQueryResolver {
     }
 
     @QueryMapping
-    public ReviewResponse review(@Argument Long id) {
-        return reviewService.getReviewById(id.intValue());
-    }
-
-    @QueryMapping
     public ReviewConnection reviews(
             @Argument Long productId,
             @Argument Long userId,

@@ -157,36 +157,6 @@ export const GET_ALL_ORDERS = gql`
   }
 `;
 
-export const GET_ORDER_BY_ID = gql`
-  query GetOrderById($id: ID!) {
-    order(id: $id) {
-      id
-      userId
-      totalAmount
-      status
-      paymentStatus
-      orderDate
-      shippingAddress
-      paymentMethod
-      notes
-      user {
-        firstName
-        lastName
-        email
-        phone
-      }
-      orderItems {
-        id
-        productId
-        productName
-        quantity
-        unitPrice
-        subtotal
-      }
-    }
-  }
-`;
-
 export const GET_USER_ORDERS = gql`
   query GetUserOrders($userId: ID, $filter: OrderFilterInput, $page: Int, $size: Int, $sortBy: String, $sortDirection: String) {
     orders(userId: $userId, filter: $filter, page: $page, size: $size, sortBy: $sortBy, sortDirection: $sortDirection) {
@@ -213,73 +183,6 @@ export const GET_USER_ORDERS = gql`
         size
         totalElements
         totalPages
-      }
-    }
-  }
-`;
-
-// Product Queries
-export const GET_PRODUCTS = gql`
-  query GetProducts(
-    $filter: ProductFilterInput
-    $page: Int
-    $size: Int
-    $sortBy: String
-    $sortDirection: String
-  ) {
-    products(
-      filter: $filter
-      page: $page
-      size: $size
-      sortBy: $sortBy
-      sortDirection: $sortDirection
-    ) {
-      products {
-        id
-        productName
-        description
-        price
-        category {
-          id
-          categoryName
-        }
-        createdAt
-      }
-      pageInfo {
-        page
-        size
-        totalElements
-        totalPages
-      }
-    }
-  }
-`;
-
-export const GET_CATEGORIES = gql`
-  query GetCategories {
-    categories {
-      id
-      categoryName
-      description
-      products {
-        id
-        productName
-      }
-    }
-  }
-`;
-
-// Inventory Queries
-export const GET_LOW_STOCK_PRODUCTS = gql`
-  query GetLowStockProducts {
-    lowStockProducts {
-      id
-      stockQuantity
-      reorderLevel
-      product {
-        id
-        productName
-        price
       }
     }
   }

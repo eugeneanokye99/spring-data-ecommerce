@@ -4,6 +4,7 @@ import com.shopjoy.dto.request.CreateUserRequest;
 import com.shopjoy.dto.response.UserResponse;
 import com.shopjoy.entity.UserType;
 import com.shopjoy.exception.DuplicateResourceException;
+import com.shopjoy.service.AuthService;
 import com.shopjoy.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,7 @@ import org.springframework.stereotype.Component;
 @Order(1)
 public class AdminUserInitializer implements CommandLineRunner {
 
+    private final AuthService authService;
     private final UserService userService;
     private final AdminUserProperties adminProperties;
 
@@ -56,7 +58,7 @@ public class AdminUserInitializer implements CommandLineRunner {
         
         log.info("Checking for existing admin user with username: {}", adminUsername);
         
-        if (userService.isUsernameTaken(adminUsername)) {
+        if (authService.isUsernameTaken(adminUsername)) {
             log.info("Admin user '{}' already exists, skipping creation", adminUsername);
             return;
         }
@@ -100,7 +102,7 @@ public class AdminUserInitializer implements CommandLineRunner {
         log.debug("Creating admin user with username: {}, email: {}", 
                 adminRequest.getUsername(), adminRequest.getEmail());
 
-        return userService.registerUser(adminRequest, UserType.ADMIN);
+        return authService.registerUser(adminRequest, UserType.ADMIN);
     }
 
     /**

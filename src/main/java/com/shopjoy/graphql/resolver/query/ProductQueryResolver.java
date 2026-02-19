@@ -1,8 +1,6 @@
 package com.shopjoy.graphql.resolver.query;
 
-import com.shopjoy.dto.filter.ProductFilter;
 import com.shopjoy.dto.response.ProductResponse;
-import com.shopjoy.graphql.input.ProductFilterInput;
 import com.shopjoy.graphql.type.PageInfo;
 import com.shopjoy.graphql.type.ProductConnection;
 import com.shopjoy.service.ProductService;
@@ -23,16 +21,8 @@ public class ProductQueryResolver {
         this.productService = productService;
     }
 
-
-
-    @QueryMapping
-    public ProductResponse product(@Argument Long id) {
-        return productService.getProductById(id.intValue());
-    }
-
     @QueryMapping
     public ProductConnection products(
-            @Argument ProductFilterInput filter,
             @Argument Integer page,
             @Argument Integer size,
             @Argument String sortBy,
@@ -42,23 +32,12 @@ public class ProductQueryResolver {
         String sort = sortBy != null ? sortBy : "id";
         String direction = sortDirection != null ? sortDirection : "ASC";
 
-        ProductFilter productFilter = null;
-        if (filter != null) {
-            productFilter = ProductFilter.builder()
-                    .minPrice(filter.minPrice() != null ? filter.minPrice().doubleValue() : null)
-                    .maxPrice(filter.maxPrice() != null ? filter.maxPrice().doubleValue() : null)
-                    .categoryId(filter.categoryId() != null ? filter.categoryId().intValue() : null)
-                    .searchTerm(filter.searchTerm())
-                    .inStock(filter.inStock())
-                    .build();
-        }
-
         // Create Pageable object and call correct service method
         Sort sortObj = Sort.by(Sort.Direction.fromString(direction), sort);
         Pageable pageable = PageRequest.of(pageNum, pageSize, sortObj);
         
         Page<ProductResponse> productsPage = productService.getProductsWithFilters(
-                productFilter,
+                null,
                 pageable,
                 sort,
                 direction

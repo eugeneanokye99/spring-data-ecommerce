@@ -2,14 +2,12 @@ package com.shopjoy.graphql.resolver.field;
 
 import com.shopjoy.dto.response.CategoryResponse;
 import com.shopjoy.dto.response.ProductResponse;
-import com.shopjoy.service.CategoryService;
 import com.shopjoy.service.ProductService;
 import org.springframework.graphql.data.method.annotation.BatchMapping;
 import org.springframework.stereotype.Controller;
 
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Controller

@@ -2,7 +2,6 @@ package com.shopjoy.graphql.resolver.query;
 
 import com.shopjoy.dto.response.InventoryResponse;
 import com.shopjoy.service.InventoryService;
-import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.stereotype.Controller;
 
@@ -15,11 +14,6 @@ public class InventoryQueryResolver {
 
     public InventoryQueryResolver(InventoryService inventoryService) {
         this.inventoryService = inventoryService;
-    }
-
-    @QueryMapping
-    public InventoryResponse inventory(@Argument Long productId) {
-        return inventoryService.getInventoryByProduct(productId.intValue());
     }
 
     @QueryMapping

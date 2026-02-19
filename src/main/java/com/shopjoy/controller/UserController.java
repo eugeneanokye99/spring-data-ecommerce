@@ -1,6 +1,5 @@
 package com.shopjoy.controller;
 
-import com.shopjoy.dto.request.CreateUserRequest;
 import com.shopjoy.dto.request.UpdateUserRequest;
 import com.shopjoy.dto.response.ApiResponse;
 import com.shopjoy.dto.response.UserResponse;
@@ -11,17 +10,15 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * The type User controller.
  */
-@Tag(name = "User Management", description = "APIs for managing users including registration, profile management, and user queries")
+@Tag(name = "User Management", description = "APIs for managing user profiles and user queries")
 @RestController
 @RequestMapping("/api/v1/users")
 public class UserController {
@@ -35,44 +32,6 @@ public class UserController {
      */
     public UserController(UserService userService) {
         this.userService = userService;
-    }
-
-    /**
-     * Register user response entity.
-     *
-     * @param request the request
-     * @return the response entity
-     */
-    @Operation(
-            summary = "Register a new user",
-            description = "Creates a new user account with the provided details including username, email, password, and user type"
-    )
-    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "201",
-                    description = "User registered successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = UserResponse.class)
-                    )
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "400",
-                    description = "Invalid input data or validation error",
-                    content = @Content(mediaType = "application/json")
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "409",
-                    description = "User with this username or email already exists",
-                    content = @Content(mediaType = "application/json")
-            )
-    })
-    @PostMapping("/register")
-    public ResponseEntity<ApiResponse<UserResponse>> registerUser(
-            @Valid @RequestBody CreateUserRequest request) {
-        UserResponse response = userService.registerUser(request);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response, "User registered successfully"));
     }
 
     /**
@@ -233,83 +192,5 @@ public class UserController {
                 .orElseThrow(() -> new com.shopjoy.exception.ResourceNotFoundException(
                         "User", "email", email));
         return ResponseEntity.ok(ApiResponse.success(response, "User found by email"));
-    }
-
-    /**
-     * Authenticate user response entity.
-     *
-     * @param request the request
-     * @return the response entity
-     */
-    @Operation(
-            summary = "Authenticate user",
-            description = "Authenticates a user with username and password (login)"
-    )
-    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "User authenticated successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = UserResponse.class)
-                    )
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "401",
-                    description = "Invalid credentials",
-                    content = @Content(mediaType = "application/json")
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "400",
-                    description = "Missing username or password",
-                    content = @Content(mediaType = "application/json")
-            )
-    })
-    @PostMapping("/authenticate")
-    public ResponseEntity<ApiResponse<UserResponse>> authenticateUser(
-            @Valid @RequestBody Map<String, String> request) {
-        String username = request.get("username");
-        String password = request.get("password");
-        UserResponse response = userService.authenticateUser(username, password);
-        return ResponseEntity.ok(ApiResponse.success(response, "User authenticated successfully"));
-    }
-
-    /**
-     * Change password response entity.
-     *
-     * @param id      the id
-     * @param request the request
-     * @return the response entity
-     */
-    @Operation(
-            summary = "Change user password",
-            description = "Changes a user's password by verifying the old password and setting a new one"
-    )
-    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "Password changed successfully",
-                    content = @Content(mediaType = "application/json")
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "404",
-                    description = "User not found",
-                    content = @Content(mediaType = "application/json")
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "400",
-                    description = "Invalid old password or validation error",
-                    content = @Content(mediaType = "application/json")
-            )
-    })
-    @PutMapping("/{id}/password")
-    public ResponseEntity<ApiResponse<Void>> changePassword(
-            @Parameter(description = "User unique identifier", required = true, example = "1")
-            @PathVariable Integer id,
-            @Valid @RequestBody Map<String, String> request) {
-        String oldPassword = request.get("oldPassword");
-        String newPassword = request.get("newPassword");
-        userService.changePassword(id, oldPassword, newPassword);
-        return ResponseEntity.ok(ApiResponse.success(null, "Password changed successfully"));
     }
 }
